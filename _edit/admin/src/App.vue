@@ -113,7 +113,7 @@
         <a v-for="postType in postTypes" :key="postType.key"
            @click="navigate('content-list', postType.key)"
            class="tab whitespace-nowrap"
-           :class="{ 'tab-active': currentView === 'content-list' && currentType === postType.key }">
+           :class="{ 'tab-active': (currentView === 'content-list' || currentView === 'content-edit') && currentType === postType.key }">
           {{ postType.label_plural }}
         </a>
       </div>

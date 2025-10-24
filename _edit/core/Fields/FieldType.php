@@ -25,9 +25,4 @@ interface FieldType
      * Convert value from database storage format
      */
     public function fromDatabase(string $value): mixed;
-
-    /**
-     * Render the input field for the admin UI
-     */
-    public function renderInput(array $config, mixed $value = null): string;
 }

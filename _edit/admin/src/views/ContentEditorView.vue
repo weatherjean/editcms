@@ -1,5 +1,8 @@
 <template>
   <div class="space-y-6">
+    <!-- Toast Notification -->
+    <Toast :show="showToast" :message="toastMessage" type="success" />
+
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold">{{ isCreating ? 'New' : 'Edit' }} {{ currentPostType?.label }}</h1>
@@ -22,121 +25,28 @@
               <p v-if="fieldGroup.description" class="text-sm opacity-60 mt-1">{{ fieldGroup.description }}</p>
             </div>
 
-            <fieldset v-for="field in fieldGroup.fields" :key="field.key" class="fieldset">
-              <legend class="fieldset-legend">
-                {{ field.label }}
-                <span v-if="field.required" class="text-error ml-1">*</span>
-              </legend>
-
-              <!-- Text Field -->
-              <input v-if="field.type === 'text'"
-                     type="text"
-                     v-model="form.fields[field.key]"
-                     :required="field.required"
-                     class="input w-full">
-
-              <!-- Textarea Field -->
-              <textarea v-else-if="field.type === 'textarea'"
-                        v-model="form.fields[field.key]"
-                        :required="field.required"
-                        rows="5"
-                        class="textarea w-full"></textarea>
-
-              <!-- Number Field -->
-              <input v-else-if="field.type === 'number'"
-                     type="number"
-                     v-model="form.fields[field.key]"
-                     :required="field.required"
-                     :min="field.config?.min"
-                     :max="field.config?.max"
-                     :step="field.config?.step || '1'"
-                     class="input w-full">
-
-              <!-- Boolean Field -->
-              <label v-else-if="field.type === 'boolean'" class="label cursor-pointer justify-start gap-4">
-                <input type="checkbox" v-model="form.fields[field.key]" class="checkbox">
-                <span class="label-text">{{ field.label }}</span>
-              </label>
-
-              <!-- Select Field -->
-              <select v-else-if="field.type === 'select'"
-                      v-model="form.fields[field.key]"
-                      :required="field.required"
-                      class="select w-full">
-                <option value="">-- Select --</option>
-                <option v-for="choice in parseSelectChoices(field.config?.choices)"
-                        :key="choice.value"
-                        :value="choice.value">
-                  {{ choice.label }}
-                </option>
-              </select>
-
-              <!-- Date Field -->
-              <input v-else-if="field.type === 'date'"
-                     type="date"
-                     v-model="form.fields[field.key]"
-                     :required="field.required"
-                     class="input w-full">
-
-              <!-- DateTime Field -->
-              <input v-else-if="field.type === 'datetime'"
-                     type="datetime-local"
-                     v-model="form.fields[field.key]"
-                     :required="field.required"
-                     class="input w-full">
-
-              <!-- Slug Field -->
-              <input v-else-if="field.type === 'slug'"
-                     type="text"
-                     v-model="form.fields[field.key]"
-                     :required="field.required"
-                     pattern="[a-z0-9\-]+"
-                     placeholder="lowercase-with-hyphens"
-                     class="input w-full">
-
-              <!-- WYSIWYG Field -->
-              <div v-else-if="field.type === 'wysiwyg'">
-                <textarea v-model="form.fields[field.key]"
-                          :required="field.required"
-                          rows="10"
-                          class="textarea w-full"></textarea>
-                <p class="label">Rich text editor (TinyMCE would initialize here)</p>
-              </div>
-
-              <!-- Media Field -->
-              <div v-else-if="field.type === 'media'">
-                <button type="button" @click="selectMedia(field.key)" class="btn btn-outline">
-                  Select Media
-                </button>
-                <div v-if="form.fields[field.key]" class="mt-2 p-2 bg-base-200 rounded">
-                  <p class="text-sm">Media ID: {{ form.fields[field.key] }}</p>
-                </div>
-              </div>
-
-              <!-- Relationship Field -->
-              <select v-else-if="field.type === 'relationship'"
-                      v-model="form.fields[field.key]"
-                      :required="field.required"
-                      class="select w-full">
-                <option value="">-- Select --</option>
-                <option value="related-1">Related Item 1 (TODO: Load dynamically)</option>
-              </select>
-
+            <div v-for="field in fieldGroup.fields" :key="field.key">
               <!-- Repeater Field -->
-              <div v-else-if="field.type === 'repeater'">
-                <div class="alert alert-info">
-                  <span>Repeater fields coming soon</span>
-                </div>
-              </div>
+              <RepeaterField
+                v-if="field.type === 'repeater'"
+                v-model="form.fields[field.key]"
+                :fields="field.config?.fields || []"
+                @selectMedia="(subFieldKey, item) => openMediaModal(subFieldKey, item)"
+              />
 
-              <!-- Fallback for unknown types -->
-              <div v-else class="alert alert-warning">
-                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 w-6 h-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                <span>Unknown field type: {{ field.type }}</span>
-              </div>
-
-              <p v-if="field.instructions" class="label">{{ field.instructions }}</p>
-            </fieldset>
+              <!-- All Other Fields -->
+              <FieldRenderer
+                v-else
+                :field="field"
+                v-model="form.fields[field.key]"
+                :relationship-items="relationshipData[field.config?.post_type]"
+                @selectMedia="openMediaModal(field.key)"
+                @loadRelationship="loadRelationshipItems"
+              >
+                <!-- Repeater slot - not used since repeater is handled above -->
+                <template #repeater></template>
+              </FieldRenderer>
+            </div>
           </div>
         </div>
 
@@ -153,39 +63,33 @@
 
       <!-- Sidebar (1/3) -->
       <div class="space-y-6">
-        <div class="card bg-base-100 border shadow">
-          <div class="card-body space-y-4">
-            <h2 class="font-semibold">Publish</h2>
-
-            <fieldset class="fieldset">
-              <legend class="fieldset-legend">Slug <span class="text-error">*</span></legend>
-              <input
-                type="text"
-                v-model="form.slug"
-                required
-                placeholder="my-unique-slug"
-                class="input w-full"
-              />
-              <p class="label">URL-friendly identifier</p>
-            </fieldset>
-
-            <fieldset class="fieldset">
-              <legend class="fieldset-legend">Status</legend>
-              <select v-model="form.status" class="select w-full">
-                <option value="draft">Draft</option>
-                <option value="published">Published</option>
-              </select>
-            </fieldset>
-          </div>
-        </div>
+        <ContentMetadata
+          v-model:slug="form.slug"
+          v-model:status="form.status"
+        />
       </div>
     </form>
+
+    <!-- Media Selection Modal -->
+    <MediaModal
+      ref="mediaModalRef"
+      :media-items="mediaItems"
+      :selected-media-id="currentMediaTarget ? currentMediaTarget[currentMediaFieldKey] : form.fields[currentMediaFieldKey]"
+      @select="selectMediaItem"
+      @close="closeMediaModal"
+      @upload="uploadMediaFile"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useApi } from '../composables/useApi'
+import Toast from '../components/Toast.vue'
+import FieldRenderer from '../components/FieldRenderer.vue'
+import RepeaterField from '../components/RepeaterField.vue'
+import MediaModal from '../components/MediaModal.vue'
+import ContentMetadata from '../components/ContentMetadata.vue'
 
 const props = defineProps(['currentType', 'currentId', 'postTypes', 'fieldGroups'])
 const emit = defineEmits(['navigate'])
@@ -197,6 +101,15 @@ const form = ref({
   status: 'draft',
   fields: {}
 })
+
+const mediaItems = ref([])
+const mediaModalRef = ref(null)
+const currentMediaFieldKey = ref(null)
+const showToast = ref(false)
+const toastMessage = ref('')
+const currentMediaTarget = ref(null) // For repeater items
+
+const relationshipData = ref({})
 
 const isCreating = computed(() => !props.currentId)
 
@@ -217,22 +130,37 @@ async function loadContentItem() {
 
   try {
     const item = await apiRequest('GET', `/${props.currentType}/${props.currentId}`)
+
     form.value = {
       slug: item.slug || '',
       status: item.status || 'draft',
-      fields: item.fields || {}
+      fields: { ...(item.fields || {}) }
     }
+
+    // Load media items so media fields can display correctly
+    await loadMedia()
   } catch (error) {
     console.error('Failed to load content item:', error)
   }
 }
 
-function resetForm() {
+async function resetForm() {
+  // Initialize all fields to ensure reactivity
+  const initializedFields = {}
+  assignedFieldGroups.value.forEach(group => {
+    group.fields.forEach(field => {
+      initializedFields[field.key] = field.type === 'repeater' ? [] : ''
+    })
+  })
+
   form.value = {
     slug: '',
     status: 'draft',
-    fields: {}
+    fields: initializedFields
   }
+
+  // Load media items so media fields can display correctly
+  await loadMedia()
 }
 
 async function saveContent() {
@@ -242,62 +170,165 @@ async function saveContent() {
       ? `/${props.currentType}`
       : `/${props.currentType}/${props.currentId}`
 
-    await apiRequest(method, url, form.value)
-    goBack()
+    // Normalize media fields: convert full media objects to IDs before saving
+    const normalizedForm = { ...form.value }
+    if (normalizedForm.fields) {
+      normalizedForm.fields = normalizeMediaFields(normalizedForm.fields)
+    }
+
+    const result = await apiRequest(method, url, normalizedForm)
+
+    // If creating, navigate to edit mode with the new ID
+    if (isCreating.value && result.id) {
+      emit('navigate', 'content-edit', props.currentType, result.id)
+    } else {
+      // Reload the content to get updated data
+      await loadContentItem()
+    }
+
+    // Show success toast
+    displayToast(isCreating.value ? 'Created successfully!' : 'Saved successfully!')
   } catch (error) {
     alert('Failed to save: ' + error.message)
   }
+}
+
+function normalizeMediaFields(fields) {
+  const normalized = {}
+
+  Object.keys(fields).forEach(key => {
+    const value = fields[key]
+
+    // Handle arrays (repeater fields)
+    if (Array.isArray(value)) {
+      normalized[key] = value.map(item => {
+        if (typeof item === 'object' && item !== null) {
+          return normalizeMediaFields(item)
+        }
+        return item
+      })
+    }
+    // Handle media objects
+    else if (value && typeof value === 'object' && value.id && value.url) {
+      normalized[key] = value.id
+    }
+    // Handle regular values
+    else {
+      normalized[key] = value
+    }
+  })
+
+  return normalized
+}
+
+function displayToast(message) {
+  toastMessage.value = message
+  showToast.value = true
+  setTimeout(() => {
+    showToast.value = false
+  }, 3000)
 }
 
 function goBack() {
   emit('navigate', 'content-list', props.currentType)
 }
 
-function parseSelectChoices(choices) {
-  if (!choices) return []
-
-  // If it's already an object, convert to array
-  if (typeof choices === 'object' && !Array.isArray(choices)) {
-    return Object.entries(choices).map(([value, label]) => ({
-      value,
-      label
-    }))
+// Media functions
+async function loadMedia() {
+  try {
+    mediaItems.value = await apiRequest('GET', '/media')
+  } catch (error) {
+    console.error('Failed to load media:', error)
   }
-
-  // If it's a string (legacy format), parse it
-  if (typeof choices === 'string') {
-    return choices.split('\n')
-      .filter(line => line.trim())
-      .map(line => {
-        const [value, label] = line.split(':').map(s => s.trim())
-        return {
-          value: value || label,
-          label: label || value
-        }
-      })
-  }
-
-  return []
 }
 
-function selectMedia(fieldKey) {
-  alert('Media selector coming soon! For now, enter a media ID directly.')
+function openMediaModal(fieldKey, target = null) {
+  currentMediaFieldKey.value = fieldKey
+  currentMediaTarget.value = target // null for regular fields, item object for repeater items
+  loadMedia()
+  mediaModalRef.value?.open()
+}
+
+function closeMediaModal() {
+  currentMediaFieldKey.value = null
+  currentMediaTarget.value = null
+}
+
+function selectMediaItem(mediaId) {
+  if (currentMediaFieldKey.value) {
+    // Find the full media object
+    const mediaObject = mediaItems.value.find(m => m.id === mediaId)
+
+    if (mediaObject) {
+      // If target is set (repeater item), set on the item object
+      if (currentMediaTarget.value) {
+        currentMediaTarget.value[currentMediaFieldKey.value] = mediaObject
+      } else {
+        // Otherwise set on the main form fields
+        form.value.fields[currentMediaFieldKey.value] = mediaObject
+      }
+    }
+  }
+}
+
+async function uploadMediaFile(file) {
+  if (!file) return
+
+  const formData = new FormData()
+  formData.append('file', file)
+
+  try {
+    const token = localStorage.getItem('edit_token')
+    const response = await fetch('http://localhost:8001/_edit/api/media', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Upload failed' }))
+      throw new Error(errorData.error || 'Upload failed')
+    }
+
+    await loadMedia()
+  } catch (error) {
+    alert('Upload failed: ' + error.message)
+    console.error('Upload error:', error)
+  }
+}
+
+// Relationship functions
+async function loadRelationshipItems(postType) {
+  if (!postType) return
+
+  // Check if already loaded
+  if (relationshipData.value[postType]) return
+
+  try {
+    const items = await apiRequest('GET', `/${postType}`)
+    relationshipData.value[postType] = items
+  } catch (error) {
+    console.error(`Failed to load ${postType}:`, error)
+    relationshipData.value[postType] = []
+  }
 }
 
 // Watch for changes
-watch(() => props.currentId, () => {
+watch(() => props.currentId, async () => {
   if (isCreating.value) {
-    resetForm()
+    await resetForm()
   } else {
-    loadContentItem()
+    await loadContentItem()
   }
 }, { immediate: true })
 
-onMounted(() => {
+onMounted(async () => {
   if (isCreating.value) {
-    resetForm()
+    await resetForm()
   } else {
-    loadContentItem()
+    await loadContentItem()
   }
 })
 </script>

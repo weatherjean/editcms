@@ -49,33 +49,4 @@ class DatetimeField extends BaseField
     {
         return $value;
     }
-
-    public function renderInput(array $config, mixed $value = null): string
-    {
-        $name = $this->getName($config);
-        $label = $this->getLabel($config);
-        $required = $this->isRequired($config) ? 'required' : '';
-
-        // Convert ISO to datetime-local format if needed
-        $displayValue = '';
-        if ($value) {
-            $date = new \DateTime($value);
-            $displayValue = $date->format('Y-m-d\TH:i');
-        }
-        $escapedValue = $this->escape($displayValue);
-
-        return <<<HTML
-        <div class="field-group">
-            <label for="{$name}" class="field-label">{$label}</label>
-            <input
-                type="datetime-local"
-                id="{$name}"
-                name="{$name}"
-                value="{$escapedValue}"
-                class="field-input"
-                {$required}
-            />
-        </div>
-        HTML;
-    }
 }

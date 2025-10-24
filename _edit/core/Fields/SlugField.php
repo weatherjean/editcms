@@ -30,29 +30,4 @@ class SlugField extends BaseField
     {
         return $value;
     }
-
-    public function renderInput(array $config, mixed $value = null): string
-    {
-        $name = $this->getName($config);
-        $label = $this->getLabel($config);
-        $required = $this->isRequired($config) ? 'required' : '';
-        $escapedValue = $value ? $this->escape((string) $value) : '';
-        $sourceField = isset($config['source']) ? $this->escape($config['source']) : 'title';
-
-        return <<<HTML
-        <div class="field-group">
-            <label for="{$name}" class="field-label">{$label}</label>
-            <input
-                type="text"
-                id="{$name}"
-                name="{$name}"
-                value="{$escapedValue}"
-                class="field-input field-slug"
-                data-slug-source="{$sourceField}"
-                {$required}
-            />
-            <small class="field-hint">Auto-generated from {$sourceField}. Edit to customize.</small>
-        </div>
-        HTML;
-    }
 }

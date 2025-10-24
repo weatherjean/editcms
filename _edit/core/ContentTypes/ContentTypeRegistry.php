@@ -48,18 +48,8 @@ class ContentTypeRegistry
             $fields = [];
             foreach ($assignedFieldGroups as $group) {
                 foreach ($group['fields'] ?? [] as $field) {
-                    $fields[$field['key']] = [
-                        'type' => $field['type'],
-                        'label' => $field['label'],
-                        'instructions' => $field['instructions'] ?? '',
-                        'required' => $field['required'] ?? false,
-                        'default_value' => $field['default_value'] ?? '',
-                    ];
-
-                    // Merge field config if present
-                    if (isset($field['config']) && is_array($field['config'])) {
-                        $fields[$field['key']] = array_merge($fields[$field['key']], $field['config']);
-                    }
+                    // Keep the entire field config to preserve nested structures (e.g., repeater fields)
+                    $fields[$field['key']] = $field;
                 }
             }
 

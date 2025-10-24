@@ -33,33 +33,4 @@ class MediaField extends BaseField
     {
         return !empty($value) ? (int) $value : null;
     }
-
-    public function renderInput(array $config, mixed $value = null): string
-    {
-        $name = $this->getName($config);
-        $label = $this->getLabel($config);
-        $required = $this->isRequired($config) ? 'required' : '';
-        $escapedValue = $value ? $this->escape((string) $value) : '';
-
-        return <<<HTML
-        <div class="field-group">
-            <label class="field-label">{$label}</label>
-            <div class="media-field" data-field="{$name}">
-                <input
-                    type="hidden"
-                    id="{$name}"
-                    name="{$name}"
-                    value="{$escapedValue}"
-                    {$required}
-                />
-                <button type="button" class="btn btn-secondary media-picker-btn" data-target="{$name}">
-                    Select Media
-                </button>
-                <div class="media-preview" id="{$name}-preview">
-                    <!-- Preview will be rendered here by JS -->
-                </div>
-            </div>
-        </div>
-        HTML;
-    }
 }

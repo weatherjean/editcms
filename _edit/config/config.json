@@ -27,7 +27,9 @@
       "key": "post_content",
       "title": "Post Content",
       "description": "Main content fields for posts",
-      "locations": ["post"],
+      "locations": [
+        "post"
+      ],
       "fields": [
         {
           "key": "excerpt",
@@ -60,7 +62,9 @@
       "key": "page_settings",
       "title": "Page Settings",
       "description": "Additional settings for pages",
-      "locations": ["page"],
+      "locations": [
+        "page"
+      ],
       "fields": [
         {
           "key": "show_in_menu",
@@ -88,7 +92,9 @@
       "key": "all_fields",
       "title": "All Field Types",
       "description": "Test all 12 field types",
-      "locations": ["field_test"],
+      "locations": [
+        "field_test"
+      ],
       "fields": [
         {
           "key": "title",

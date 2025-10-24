@@ -93,6 +93,11 @@ class ContentType
             $params = [];
 
             if (isset($data['slug'])) {
+                // Slug is required and cannot be empty
+                if (empty($data['slug'])) {
+                    throw new \RuntimeException("Slug is required and cannot be empty");
+                }
+
                 // Check slug uniqueness (excluding current item)
                 $existing = $this->db->query(
                     "SELECT id FROM content WHERE type = ? AND slug = ? AND id != ?",
@@ -231,23 +236,29 @@ class ContentType
     private function saveMeta(int $contentId, array $fields): void
     {
         foreach ($fields as $key => $value) {
-            if (!isset($this->fieldInstances[$key])) {
-                continue;
+            $dbValue = $value;
+
+            // If field has a Field class instance, use it for validation/sanitization
+            if (isset($this->fieldInstances[$key]) && isset($this->config['fields'][$key])) {
+                $fieldInstance = $this->fieldInstances[$key];
+                $fieldConfig = $this->config['fields'][$key];
+
+                // Validate
+                if (!$fieldInstance->validate($value, $fieldConfig)) {
+                    throw new \RuntimeException("Validation failed for field '{$key}'");
+                }
+
+                // Sanitize
+                $sanitized = $fieldInstance->sanitize($value, $fieldConfig);
+
+                // Convert to database format
+                $dbValue = $fieldInstance->toDatabase($sanitized);
+            } else {
+                // For fields without Field classes, just JSON encode arrays/objects
+                if (is_array($value) || is_object($value)) {
+                    $dbValue = json_encode($value);
+                }
             }
-
-            $fieldInstance = $this->fieldInstances[$key];
-            $fieldConfig = $this->config['fields'][$key];
-
-            // Validate
-            if (!$fieldInstance->validate($value, $fieldConfig)) {
-                throw new \RuntimeException("Validation failed for field '{$key}'");
-            }
-
-            // Sanitize
-            $sanitized = $fieldInstance->sanitize($value, $fieldConfig);
-
-            // Convert to database format
-            $dbValue = $fieldInstance->toDatabase($sanitized);
 
             // Insert meta
             $this->db->execute(
@@ -289,46 +300,94 @@ class ContentType
      */
     private function populateRelationships(array $content): array
     {
-        if (!isset($content['fields'])) {
+        if (!isset($content['fields']) || !isset($this->config['fields'])) {
             return $content;
         }
 
-        foreach ($this->config['fields'] as $fieldKey => $fieldConfig) {
-            $fieldType = $fieldConfig['type'];
+        try {
+            foreach ($this->config['fields'] as $fieldKey => $fieldConfig) {
+                if (!isset($fieldConfig['type'])) {
+                    continue;
+                }
 
-            // Handle media fields
-            if ($fieldType === 'media' && isset($content['fields'][$fieldKey])) {
-                $mediaId = $content['fields'][$fieldKey];
-                if ($mediaId) {
-                    $media = $this->db->query("SELECT * FROM media WHERE id = ?", [$mediaId]);
-                    if (!empty($media)) {
-                        $mediaData = $media[0];
-                        $mediaData['url'] = '/_edit/uploads/' . $mediaData['path'];
-                        $content['fields'][$fieldKey] = $mediaData;
+                $fieldType = $fieldConfig['type'];
+
+                // Handle media fields
+                if ($fieldType === 'media' && isset($content['fields'][$fieldKey])) {
+                    try {
+                        $content['fields'][$fieldKey] = $this->populateMediaField($content['fields'][$fieldKey]);
+                    } catch (\Exception $e) {
+                        error_log("Failed to populate media field {$fieldKey}: " . $e->getMessage());
+                    }
+                }
+
+                // Handle relationship fields
+                if ($fieldType === 'relationship' && isset($content['fields'][$fieldKey])) {
+                    try {
+                        $relatedId = $content['fields'][$fieldKey];
+                        $target = $fieldConfig['target'] ?? 'content';
+
+                        if ($relatedId) {
+                            if ($target === 'user') {
+                                $related = $this->db->query("SELECT id, name, email FROM users WHERE id = ?", [$relatedId]);
+                            } else {
+                                $related = $this->db->query("SELECT id, type, slug FROM content WHERE id = ?", [$relatedId]);
+                            }
+
+                            if (!empty($related)) {
+                                $content['fields'][$fieldKey] = $related[0];
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        error_log("Failed to populate relationship field {$fieldKey}: " . $e->getMessage());
+                    }
+                }
+
+                // Handle repeater fields - recursively populate nested media fields
+                if ($fieldType === 'repeater' && isset($content['fields'][$fieldKey])) {
+                    try {
+                        $repeaterItems = $content['fields'][$fieldKey];
+                        if (is_array($repeaterItems)) {
+                            foreach ($repeaterItems as $index => $item) {
+                                if (is_array($item) && isset($fieldConfig['config']['fields'])) {
+                                    foreach ($fieldConfig['config']['fields'] as $subField) {
+                                        if ($subField['type'] === 'media' && isset($item[$subField['key']])) {
+                                            $content['fields'][$fieldKey][$index][$subField['key']] =
+                                                $this->populateMediaField($item[$subField['key']]);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        error_log("Failed to populate repeater field {$fieldKey}: " . $e->getMessage());
                     }
                 }
             }
-
-            // Handle relationship fields
-            if ($fieldType === 'relationship' && isset($content['fields'][$fieldKey])) {
-                $relatedId = $content['fields'][$fieldKey];
-                $target = $fieldConfig['target'] ?? 'content';
-
-                if ($relatedId) {
-                    if ($target === 'user') {
-                        $related = $this->db->query("SELECT id, name, email FROM users WHERE id = ?", [$relatedId]);
-                    } else {
-                        $related = $this->db->query("SELECT id, type, slug FROM content WHERE id = ?", [$relatedId]);
-                    }
-
-                    if (!empty($related)) {
-                        $content['fields'][$fieldKey] = $related[0];
-                    }
-                }
-            }
+        } catch (\Exception $e) {
+            error_log("Error in populateRelationships: " . $e->getMessage());
         }
 
         return $content;
+    }
+
+    /**
+     * Populate a media field with full media data
+     */
+    private function populateMediaField($mediaId)
+    {
+        if (!$mediaId) {
+            return null;
+        }
+
+        $media = $this->db->query("SELECT * FROM media WHERE id = ?", [$mediaId]);
+        if (!empty($media)) {
+            $mediaData = $media[0];
+            $mediaData['url'] = '/_edit/uploads/' . $mediaData['path'];
+            return $mediaData;
+        }
+
+        return $mediaId;
     }
 
     /**

@@ -41,32 +41,4 @@ class NumberField extends BaseField
 
         return strpos($value, '.') !== false ? (float) $value : (int) $value;
     }
-
-    public function renderInput(array $config, mixed $value = null): string
-    {
-        $name = $this->getName($config);
-        $label = $this->getLabel($config);
-        $required = $this->isRequired($config) ? 'required' : '';
-        $escapedValue = $value !== null ? $this->escape((string) $value) : '';
-        $min = isset($config['min']) ? "min=\"{$config['min']}\"" : '';
-        $max = isset($config['max']) ? "max=\"{$config['max']}\"" : '';
-        $step = isset($config['step']) ? "step=\"{$config['step']}\"" : '';
-
-        return <<<HTML
-        <div class="field-group">
-            <label for="{$name}" class="field-label">{$label}</label>
-            <input
-                type="number"
-                id="{$name}"
-                name="{$name}"
-                value="{$escapedValue}"
-                class="field-input"
-                {$min}
-                {$max}
-                {$step}
-                {$required}
-            />
-        </div>
-        HTML;
-    }
 }

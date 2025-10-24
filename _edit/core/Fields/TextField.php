@@ -15,28 +15,4 @@ class TextField extends BaseField
     {
         return $value;
     }
-
-    public function renderInput(array $config, mixed $value = null): string
-    {
-        $name = $this->getName($config);
-        $label = $this->getLabel($config);
-        $required = $this->isRequired($config) ? 'required' : '';
-        $escapedValue = $value ? $this->escape((string) $value) : '';
-        $placeholder = isset($config['placeholder']) ? $this->escape($config['placeholder']) : '';
-
-        return <<<HTML
-        <div class="field-group">
-            <label for="{$name}" class="field-label">{$label}</label>
-            <input
-                type="text"
-                id="{$name}"
-                name="{$name}"
-                value="{$escapedValue}"
-                placeholder="{$placeholder}"
-                class="field-input"
-                {$required}
-            />
-        </div>
-        HTML;
-    }
 }

@@ -29,33 +29,4 @@ class SelectField extends BaseField
     {
         return $value;
     }
-
-    public function renderInput(array $config, mixed $value = null): string
-    {
-        $name = $this->getName($config);
-        $label = $this->getLabel($config);
-        $required = $this->isRequired($config) ? 'required' : '';
-        $options = $config['options'] ?? [];
-
-        $optionsHtml = '<option value="">-- Select --</option>';
-        foreach ($options as $option) {
-            $escapedOption = $this->escape($option);
-            $selected = ($value === $option) ? 'selected' : '';
-            $optionsHtml .= "<option value=\"{$escapedOption}\" {$selected}>{$escapedOption}</option>";
-        }
-
-        return <<<HTML
-        <div class="field-group">
-            <label for="{$name}" class="field-label">{$label}</label>
-            <select
-                id="{$name}"
-                name="{$name}"
-                class="field-select"
-                {$required}
-            >
-                {$optionsHtml}
-            </select>
-        </div>
-        HTML;
-    }
 }

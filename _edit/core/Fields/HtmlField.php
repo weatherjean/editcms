@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Edit\Core\Fields;
 
-class WysiwygField extends BaseField
+class HtmlField extends BaseField
 {
     public function toDatabase(mixed $value): string
     {
@@ -18,7 +18,7 @@ class WysiwygField extends BaseField
 
     public function sanitize(mixed $value, array $config): mixed
     {
-        // Allow HTML tags for WYSIWYG content
+        // Allow HTML tags for HTML content
         return $value;
     }
 }

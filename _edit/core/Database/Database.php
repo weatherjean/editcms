@@ -73,7 +73,7 @@ class Database
                 CREATE TABLE IF NOT EXISTS content (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     type TEXT NOT NULL,
-                    slug TEXT NOT NULL,
+                    slug TEXT NOT NULL CHECK(length(slug) > 0),
                     status TEXT DEFAULT 'draft',
                     author_id INTEGER,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

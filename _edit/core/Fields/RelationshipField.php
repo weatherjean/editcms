@@ -33,30 +33,4 @@ class RelationshipField extends BaseField
     {
         return !empty($value) ? (int) $value : null;
     }
-
-    public function renderInput(array $config, mixed $value = null): string
-    {
-        $name = $this->getName($config);
-        $label = $this->getLabel($config);
-        $required = $this->isRequired($config) ? 'required' : '';
-        $target = $config['target'] ?? 'content';
-        $escapedValue = $value ? $this->escape((string) $value) : '';
-
-        return <<<HTML
-        <div class="field-group">
-            <label for="{$name}" class="field-label">{$label}</label>
-            <select
-                id="{$name}"
-                name="{$name}"
-                class="field-select field-relationship"
-                data-relationship-target="{$target}"
-                {$required}
-            >
-                <option value="">-- Select --</option>
-                <!-- Options will be loaded via JS from API -->
-            </select>
-            <input type="hidden" name="{$name}_value" value="{$escapedValue}" />
-        </div>
-        HTML;
-    }
 }

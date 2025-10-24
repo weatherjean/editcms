@@ -20,28 +20,4 @@ class BooleanField extends BaseField
     {
         return $value === '1';
     }
-
-    public function renderInput(array $config, mixed $value = null): string
-    {
-        $name = $this->getName($config);
-        $label = $this->getLabel($config);
-        $checked = $value ? 'checked' : '';
-        $description = isset($config['description']) ? $this->escape($config['description']) : '';
-
-        return <<<HTML
-        <div class="field-group">
-            <label class="field-checkbox">
-                <input
-                    type="checkbox"
-                    id="{$name}"
-                    name="{$name}"
-                    value="1"
-                    {$checked}
-                />
-                <span>{$label}</span>
-            </label>
-            {$description}
-        </div>
-        HTML;
-    }
 }
