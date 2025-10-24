@@ -1,16 +1,18 @@
 <template>
-  <div class="view-container">
-    <div class="view-header">
-      <h2>Configuration</h2>
-      <p class="help-text">Edit your CMS configuration. This JSON file defines all post types and field groups.</p>
+  <div class="space-y-6">
+    <div>
+      <h1 class="text-3xl font-bold">Configuration</h1>
+      <p class="text-sm opacity-60 mt-1">Define post types and field groups for your CMS</p>
     </div>
 
-    <div class="config-section">
-      <JsonEditor
-        title="CMS Configuration (config.json)"
-        :modelValue="config"
-        @save="saveConfig"
-      />
+    <div class="card bg-base-100 card-border border-base-300 card-sm shadow">
+      <div class="card-body gap-4">
+        <JsonEditor
+          title="config.json"
+          :modelValue="config"
+          @save="saveConfig"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -50,9 +52,3 @@ onMounted(() => {
   loadConfig()
 })
 </script>
-
-<style scoped>
-.config-section {
-  margin-top: 20px;
-}
-</style>
