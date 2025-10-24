@@ -1,0 +1,41 @@
+# Dependencies
+_edit/admin/node_modules/
+_edit/admin/package-lock.json
+
+# Build outputs
+_edit/admin-dist/
+_edit/admin/dist/
+
+# Database
+_edit/database/*.sqlite
+_edit/database/*.db
+
+# Uploads
+_edit/uploads/*
+!_edit/uploads/.gitkeep
+
+# Logs
+*.log
+server.log
+
+# Environment
+.env
+.env.local
+
+# JWT Secret
+_edit/config/jwt-secret.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp

@@ -1,0 +1,38 @@
+# Node modules
+node_modules/
+admin/node_modules/
+
+# Build output
+admin-dist/
+dist/
+
+# Database
+database/*.sqlite
+database/*.db
+
+# Environment
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# Uploads (optional - remove if you want to track uploads)
+uploads/
+
+# Temporary files
+*.tmp
+*.bak
+*.old
