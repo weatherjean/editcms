@@ -5,8 +5,8 @@
       <p class="text-sm opacity-60 mt-1">Define post types and field groups for your CMS</p>
     </div>
 
-    <div class="card bg-base-100 card-border border-base-300 card-sm shadow">
-      <div class="card-body gap-4">
+    <div class="card bg-base-100 border shadow">
+      <div class="card-body">
         <JsonEditor
           title="config.json"
           :modelValue="config"
