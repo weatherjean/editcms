@@ -19,7 +19,7 @@
               <span class="text-2xl">{{ getBlock(item.block_type)?.icon || '📦' }}</span>
               <div>
                 <h3 class="font-semibold">{{ getBlock(item.block_type)?.label || item.block_type }}</h3>
-                <p v-if="getBlock(item.block_type)?.description" class="text-xs opacity-60">
+                <p v-if="getBlock(item.block_type)?.description" class="text-sm opacity-60">
                   {{ getBlock(item.block_type)?.description }}
                 </p>
               </div>
@@ -29,7 +29,7 @@
                 type="button"
                 @click="moveBlock(index, -1)"
                 :disabled="index === 0"
-                class="btn btn-xs btn-ghost"
+                class="btn btn-sm btn-ghost"
                 title="Move Up"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
@@ -40,7 +40,7 @@
                 type="button"
                 @click="moveBlock(index, 1)"
                 :disabled="index === modelValue.length - 1"
-                class="btn btn-xs btn-ghost"
+                class="btn btn-sm btn-ghost"
                 title="Move Down"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
@@ -50,7 +50,7 @@
               <button
                 type="button"
                 @click="removeBlock(index)"
-                class="btn btn-xs btn-error btn-ghost"
+                class="btn btn-sm btn-error btn-ghost"
                 title="Remove Block"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">

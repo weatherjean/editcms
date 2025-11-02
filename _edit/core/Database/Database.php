@@ -58,6 +58,29 @@ class Database
 
         if ($isNewDatabase) {
             $this->createSchema();
+        } else {
+            // For existing databases, ensure new tables exist (migrations)
+            $this->runMigrations();
+        }
+    }
+
+    private function runMigrations(): void
+    {
+        // Check if settings table exists
+        $settingsCheck = $this->query(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='settings'"
+        );
+
+        if (empty($settingsCheck)) {
+            // Create settings table
+            $this->execute("
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
         }
     }
 
@@ -124,6 +147,16 @@ class Database
                     size INTEGER,
                     alt_text TEXT,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+
+            // Settings table - key-value pairs for system settings
+            $this->execute("
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             ");
 

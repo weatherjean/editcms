@@ -15,7 +15,7 @@ class Auth
     public function __construct(Database $db, ?JWT $jwt = null)
     {
         $this->db = $db;
-        $this->jwt = $jwt ?? new JWT();
+        $this->jwt = $jwt ?? new JWT(null, $db);
     }
 
     /**

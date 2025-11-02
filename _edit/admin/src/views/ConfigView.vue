@@ -32,58 +32,46 @@
         <div class="card-body">
           <div class="flex items-center justify-between mb-4">
             <div>
-              <h2 class="card-title">📦 Modules</h2>
-              <p class="text-sm opacity-60">Post types with their specific field groups</p>
+              <h2 class="card-title">📦 Post Types</h2>
+              <p class="text-sm opacity-60">Content types with their specific field groups</p>
             </div>
-            <label class="btn btn-sm btn-primary gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
-              </svg>
-              Upload Module
-              <input type="file" accept=".json" @change="handleUpload($event, 'modules')" class="hidden">
-            </label>
+            <button @click="createPostType" class="btn btn-sm btn-primary gap-2">
+              + Create Post Type
+            </button>
           </div>
 
-          <div v-if="config.modules.length === 0" class="text-center py-8 text-base-content/60">
-            No modules found
+          <div v-if="modules.length === 0" class="text-center py-8 text-base-content/60">
+            No post types found. Create one to get started!
           </div>
 
           <div v-else class="overflow-x-auto">
-            <table class="table table-sm">
+            <table class="table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Size</th>
-                  <th>Modified</th>
+                  <th>Post Type</th>
+                  <th>Labels</th>
+                  <th>Field Groups</th>
                   <th class="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="file in config.modules" :key="file.filename">
-                  <td class="font-mono">{{ file.filename }}</td>
-                  <td>{{ formatSize(file.size) }}</td>
-                  <td>{{ formatDate(file.modified) }}</td>
+                <tr v-for="module in modules" :key="module.file.filename">
+                  <td>
+                    <div class="font-semibold">{{ module.data.post_types[0]?.label || 'Unknown' }}</div>
+                    <div class="text-xs font-mono opacity-60">{{ module.data.post_types[0]?.key }}</div>
+                  </td>
+                  <td>
+                    <div class="text-sm">{{ module.data.post_types[0]?.label_plural || '-' }}</div>
+                    <span v-if="module.data.post_types[0]?.allow_open" class="badge badge-xs">Flexible</span>
+                  </td>
+                  <td>
+                    <div class="text-sm">{{ module.data.field_groups?.length || 0 }} group(s)</div>
+                  </td>
                   <td class="text-right">
-                    <div class="flex gap-2 justify-end">
-                      <button @click="downloadFile('modules', file.name)" class="btn btn-ghost btn-xs gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                        </svg>
-                        Download
-                      </button>
-                      <label class="btn btn-ghost btn-xs gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                        </svg>
-                        Replace
-                        <input type="file" accept=".json" @change="handleUpload($event, 'modules')" class="hidden">
-                      </label>
-                      <button @click="confirmDelete('modules', file)" class="btn btn-ghost btn-xs text-error gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                        </svg>
-                        Delete
-                      </button>
+                    <div class="join">
+                      <button @click="editPostType(module)" class="btn btn-ghost btn-sm join-item">Edit</button>
+                      <button @click="downloadFile('modules', module.file.name)" class="btn btn-ghost btn-sm join-item">Download</button>
+                      <button @click="confirmDelete('modules', module.file)" class="btn btn-ghost btn-sm btn-error join-item">Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -101,55 +89,44 @@
               <h2 class="card-title">🏷️ Shared Field Groups</h2>
               <p class="text-sm opacity-60">Reusable field collections</p>
             </div>
-            <label class="btn btn-sm btn-primary gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
-              </svg>
-              Upload Field Group
-              <input type="file" accept=".json" @change="handleUpload($event, 'field-groups')" class="hidden">
-            </label>
+            <button @click="createFieldGroup" class="btn btn-sm btn-primary gap-2">
+              + Create Field Group
+            </button>
           </div>
 
-          <div v-if="config.field_groups.length === 0" class="text-center py-8 text-base-content/60">
-            No field groups found
+          <div v-if="fieldGroups.length === 0" class="text-center py-8 text-base-content/60">
+            No field groups found. Create reusable field groups like "SEO Fields"!
           </div>
 
           <div v-else class="overflow-x-auto">
-            <table class="table table-sm">
+            <table class="table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Size</th>
-                  <th>Modified</th>
+                  <th>Field Group</th>
+                  <th>Locations</th>
+                  <th>Fields</th>
                   <th class="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="file in config.field_groups" :key="file.filename">
-                  <td class="font-mono">{{ file.filename }}</td>
-                  <td>{{ formatSize(file.size) }}</td>
-                  <td>{{ formatDate(file.modified) }}</td>
+                <tr v-for="fg in fieldGroups" :key="fg.file.filename">
+                  <td>
+                    <div class="font-semibold">{{ fg.data.title || 'Unknown' }}</div>
+                    <div class="text-xs font-mono opacity-60">{{ fg.data.key }}</div>
+                  </td>
+                  <td>
+                    <div class="flex flex-wrap gap-1">
+                      <span v-for="loc in fg.data.locations" :key="loc" class="badge badge-xs">{{ loc }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="text-sm">{{ fg.data.fields?.length || 0 }} field(s)</div>
+                  </td>
                   <td class="text-right">
-                    <div class="flex gap-2 justify-end">
-                      <button @click="downloadFile('field-groups', file.name)" class="btn btn-ghost btn-xs gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                        </svg>
-                        Download
-                      </button>
-                      <label class="btn btn-ghost btn-xs gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                        </svg>
-                        Replace
-                        <input type="file" accept=".json" @change="handleUpload($event, 'field-groups')" class="hidden">
-                      </label>
-                      <button @click="confirmDelete('field-groups', file)" class="btn btn-ghost btn-xs text-error gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                        </svg>
-                        Delete
-                      </button>
+                    <div class="join">
+                      <button @click="editFieldGroup(fg)" class="btn btn-ghost btn-sm join-item">Edit</button>
+                      <button @click="downloadFile('field-groups', fg.file.name)" class="btn btn-ghost btn-sm join-item">Download</button>
+                      <button @click="confirmDelete('field-groups', fg.file)" class="btn btn-ghost btn-sm btn-error join-item">Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -167,55 +144,43 @@
               <h2 class="card-title">🧱 Content Blocks</h2>
               <p class="text-sm opacity-60">Flexible content building blocks</p>
             </div>
-            <label class="btn btn-sm btn-primary gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
-              </svg>
-              Upload Block
-              <input type="file" accept=".json" @change="handleUpload($event, 'blocks')" class="hidden">
-            </label>
+            <button @click="createBlock" class="btn btn-sm btn-primary gap-2">
+              + Create Block
+            </button>
           </div>
 
-          <div v-if="config.blocks.length === 0" class="text-center py-8 text-base-content/60">
-            No blocks found
+          <div v-if="blocks.length === 0" class="text-center py-8 text-base-content/60">
+            No blocks found. Create blocks for flexible content like "Hero Section"!
           </div>
 
           <div v-else class="overflow-x-auto">
-            <table class="table table-sm">
+            <table class="table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Size</th>
-                  <th>Modified</th>
+                  <th>Block</th>
+                  <th>Fields</th>
                   <th class="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="file in config.blocks" :key="file.filename">
-                  <td class="font-mono">{{ file.filename }}</td>
-                  <td>{{ formatSize(file.size) }}</td>
-                  <td>{{ formatDate(file.modified) }}</td>
+                <tr v-for="block in blocks" :key="block.file.filename">
+                  <td>
+                    <div class="flex items-center gap-2">
+                      <span class="text-2xl">{{ block.data.icon || '📦' }}</span>
+                      <div>
+                        <div class="font-semibold">{{ block.data.label || 'Unknown' }}</div>
+                        <div class="text-xs font-mono opacity-60">{{ block.data.key }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="text-sm">{{ block.data.fields?.length || 0 }} field(s)</div>
+                  </td>
                   <td class="text-right">
-                    <div class="flex gap-2 justify-end">
-                      <button @click="downloadFile('blocks', file.name)" class="btn btn-ghost btn-xs gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                        </svg>
-                        Download
-                      </button>
-                      <label class="btn btn-ghost btn-xs gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                        </svg>
-                        Replace
-                        <input type="file" accept=".json" @change="handleUpload($event, 'blocks')" class="hidden">
-                      </label>
-                      <button @click="confirmDelete('blocks', file)" class="btn btn-ghost btn-xs text-error gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                        </svg>
-                        Delete
-                      </button>
+                    <div class="join">
+                      <button @click="editBlock(block)" class="btn btn-ghost btn-sm join-item">Edit</button>
+                      <button @click="downloadFile('blocks', block.file.name)" class="btn btn-ghost btn-sm join-item">Download</button>
+                      <button @click="confirmDelete('blocks', block.file)" class="btn btn-ghost btn-sm btn-error join-item">Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -240,7 +205,7 @@
           <button type="button" @click="closeDeleteModal" class="btn">Cancel</button>
           <button @click="handleDelete" class="btn btn-error" :disabled="submitting">
             <span v-if="submitting" class="loading loading-spinner"></span>
-            Delete File
+            Delete
           </button>
         </div>
       </div>
@@ -248,12 +213,20 @@
         <button @click="closeDeleteModal">close</button>
       </form>
     </dialog>
+
+    <!-- Editor Modals -->
+    <PostTypeEditor ref="postTypeEditorRef" :all-post-types="allPostTypes" @saved="handleSaved" />
+    <FieldGroupEditor ref="fieldGroupEditorRef" :available-post-types="allPostTypes" @saved="handleSaved" />
+    <BlockEditor ref="blockEditorRef" :available-post-types="allPostTypes" @saved="handleSaved" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useApi } from '../composables/useApi'
+import PostTypeEditor from '../components/PostTypeEditor.vue'
+import FieldGroupEditor from '../components/FieldGroupEditor.vue'
+import BlockEditor from '../components/BlockEditor.vue'
 
 const { apiRequest } = useApi()
 
@@ -263,6 +236,10 @@ const config = ref({
   blocks: []
 })
 
+const modules = ref([])
+const fieldGroups = ref([])
+const blocks = ref([])
+
 const loading = ref(false)
 const submitting = ref(false)
 const error = ref(null)
@@ -271,11 +248,35 @@ const showDeleteModal = ref(false)
 const deleteTarget = ref(null)
 const deleteType = ref(null)
 
+const postTypeEditorRef = ref(null)
+const fieldGroupEditorRef = ref(null)
+const blockEditorRef = ref(null)
+
+const allPostTypes = computed(() => {
+  return modules.value.map(m => m.data.post_types[0]).filter(Boolean)
+})
+
 async function loadConfig() {
   loading.value = true
   try {
     const data = await apiRequest('GET', '/config')
     config.value = data
+
+    // Load full JSON data for each item
+    modules.value = await Promise.all(data.modules.map(async file => {
+      const json = await loadJsonFile('modules', file.name)
+      return { file, data: json }
+    }))
+
+    fieldGroups.value = await Promise.all(data.field_groups.map(async file => {
+      const json = await loadJsonFile('field-groups', file.name)
+      return { file, data: json }
+    }))
+
+    blocks.value = await Promise.all(data.blocks.map(async file => {
+      const json = await loadJsonFile('blocks', file.name)
+      return { file, data: json }
+    }))
   } catch (err) {
     console.error('Failed to load config:', err)
   } finally {
@@ -283,6 +284,49 @@ async function loadConfig() {
   }
 }
 
+async function loadJsonFile(type, name) {
+  try {
+    const response = await fetch(`/_edit/api/config/${type}/${name}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('edit_token')}`
+      }
+    })
+    if (!response.ok) throw new Error('Failed to load')
+    return await response.json()
+  } catch (err) {
+    console.error(`Failed to load ${type}/${name}:`, err)
+    return {}
+  }
+}
+
+// Post Type Actions
+function createPostType() {
+  postTypeEditorRef.value?.open()
+}
+
+function editPostType(module) {
+  postTypeEditorRef.value?.open(module.data)
+}
+
+// Field Group Actions
+function createFieldGroup() {
+  fieldGroupEditorRef.value?.open()
+}
+
+function editFieldGroup(fg) {
+  fieldGroupEditorRef.value?.open(fg.data)
+}
+
+// Block Actions
+function createBlock() {
+  blockEditorRef.value?.open()
+}
+
+function editBlock(block) {
+  blockEditorRef.value?.open(block.data)
+}
+
+// Download
 async function downloadFile(type, name) {
   try {
     const response = await fetch(`/_edit/api/config/${type}/${name}`, {
@@ -305,6 +349,7 @@ async function downloadFile(type, name) {
   }
 }
 
+// Export/Import All
 async function exportAll() {
   try {
     const response = await fetch('/_edit/api/config/export', {
@@ -344,11 +389,10 @@ async function handleImportAll(event) {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
 
-    await loadConfig()
-    emit('reload')
+    await handleSaved()
 
     // Show detailed results
-    const summary = `Imported:\n- ${result.imported.modules} modules\n- ${result.imported.field_groups} field groups\n- ${result.imported.blocks} blocks`
+    const summary = `Imported:\n- ${result.imported.modules} modules\n- ${result.imported.field_groups} field groups\n- ${result.imported.blocks} blocks\n\nBackup saved: ${result.backup}`
 
     if (result.errors && result.errors.length > 0) {
       alert(`${summary}\n\nErrors:\n${result.errors.join('\n')}`)
@@ -362,28 +406,7 @@ async function handleImportAll(event) {
   event.target.value = ''
 }
 
-async function handleUpload(event, type) {
-  const file = event.target.files[0]
-  if (!file) return
-
-  const formData = new FormData()
-  formData.append('file', file)
-
-  try {
-    await apiRequest('POST', `/config/${type}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
-    await loadConfig()
-    // Reload the page to refresh post types/field groups
-    emit('reload')
-  } catch (err) {
-    alert(err.message || 'Upload failed')
-  }
-
-  // Reset input
-  event.target.value = ''
-}
-
+// Delete
 function confirmDelete(type, file) {
   deleteType.value = type
   deleteTarget.value = file
@@ -399,10 +422,8 @@ async function handleDelete() {
 
   try {
     await apiRequest('DELETE', `/config/${deleteType.value}/${deleteTarget.value.name}`)
-    await loadConfig()
+    await handleSaved()
     closeDeleteModal()
-    // Reload the page to refresh post types/field groups
-    emit('reload')
   } catch (err) {
     error.value = err.message || 'Failed to delete file'
   } finally {
@@ -417,21 +438,10 @@ function closeDeleteModal() {
   error.value = null
 }
 
-function formatSize(bytes) {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-}
-
-function formatDate(timestamp) {
-  const date = new Date(timestamp * 1000)
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+// After any save/delete
+async function handleSaved() {
+  await loadConfig()
+  emit('reload')
 }
 
 const emit = defineEmits(['reload'])

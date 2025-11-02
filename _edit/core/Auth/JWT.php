@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace Edit\Core\Auth;
 
+use Edit\Core\Database\Database;
+
 class JWT
 {
     private string $secret;
     private string $algorithm = 'HS256';
+    private ?Database $db = null;
 
-    public function __construct(?string $secret = null)
+    public function __construct(?string $secret = null, ?Database $db = null)
     {
-        // Use provided secret or generate one (should be stored in config)
+        $this->db = $db;
+        // Use provided secret or get/create from database
         $this->secret = $secret ?? $this->getOrCreateSecret();
     }
 
@@ -97,27 +101,48 @@ class JWT
     }
 
     /**
-     * Get or create a secret key
+     * Get or create a secret key from database
      */
     private function getOrCreateSecret(): string
     {
-        $secretFile = dirname(__DIR__, 2) . '/config/jwt-secret.txt';
+        // If no database available, fall back to a temporary secret (shouldn't happen in practice)
+        if (!$this->db) {
+            return bin2hex(random_bytes(32));
+        }
 
+        // Try to get existing secret from settings table
+        $result = $this->db->query("SELECT value FROM settings WHERE key = ?", ['jwt_secret']);
+
+        if (!empty($result)) {
+            return $result[0]['value'];
+        }
+
+        // Check if old file-based secret exists (migration path)
+        $secretFile = dirname(__DIR__, 2) . '/config/jwt-secret.txt';
         if (file_exists($secretFile)) {
-            return trim(file_get_contents($secretFile));
+            $secret = trim(file_get_contents($secretFile));
+
+            // Migrate to database
+            $this->db->execute(
+                "INSERT INTO settings (key, value) VALUES (?, ?)",
+                ['jwt_secret', $secret]
+            );
+
+            // Optionally delete the file after migration
+            // Commented out to be safe - can be manually deleted
+            // @unlink($secretFile);
+
+            return $secret;
         }
 
         // Generate a new secret
         $secret = bin2hex(random_bytes(32));
 
-        // Save it
-        $dir = dirname($secretFile);
-        if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
-        }
-
-        file_put_contents($secretFile, $secret);
-        chmod($secretFile, 0600);
+        // Save it to database
+        $this->db->execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?)",
+            ['jwt_secret', $secret]
+        );
 
         return $secret;
     }

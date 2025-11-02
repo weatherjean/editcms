@@ -8,6 +8,7 @@ use Edit\Core\Database\Database;
 use Edit\Core\Auth\Auth;
 use Edit\Core\ContentTypes\ContentTypeRegistry;
 use Edit\Core\ContentTypes\ContentType;
+use Edit\Core\Email\Email;
 
 // Handle CORS - Allow requests from Vite dev server
 header('Access-Control-Allow-Origin: http://localhost:5173');
@@ -208,6 +209,45 @@ if (preg_match('#^/users/(\d+)$#', $path, $matches) && $method === 'DELETE') {
     sendJson(['success' => true, 'message' => 'User deleted successfully']);
 }
 
+// ============================================
+// EMAIL API (public - for contact forms)
+// ============================================
+
+if ($path === '/send-email' && $method === 'POST') {
+    $data = getJsonBody();
+
+    // Validate required fields
+    if (!isset($data['to']) || !isset($data['subject']) || !isset($data['message'])) {
+        sendError('Missing required fields: to, subject, message', 400);
+    }
+
+    // Load email configuration
+    $emailConfigFile = EDIT_BASE_PATH . '/config/email.json';
+    $emailConfig = ['from_email' => '', 'from_name' => ''];
+
+    if (file_exists($emailConfigFile)) {
+        $emailConfig = json_decode(file_get_contents($emailConfigFile), true);
+    }
+
+    // Create email instance
+    $email = new Email($emailConfig['from_email'], $emailConfig['from_name']);
+
+    // Allow overriding from address (if provided)
+    if (isset($data['from_email'])) {
+        $email->setFrom($data['from_email'], $data['from_name'] ?? '');
+    }
+
+    // Send email
+    $isHtml = $data['is_html'] ?? true;
+    $success = $email->send($data['to'], $data['subject'], $data['message'], $isHtml);
+
+    if ($success) {
+        sendJson(['success' => true, 'message' => 'Email sent successfully']);
+    } else {
+        sendError('Failed to send email', 500);
+    }
+}
+
 // Verify authentication for all other endpoints
 $userId = $auth->verifyRequest();
 if (!$userId) {
@@ -334,6 +374,46 @@ if (preg_match('#^/config/(modules|field-groups|blocks)/([a-z0-9_-]+)$#', $path,
     header('Content-Disposition: attachment; filename="' . basename($file) . '"');
     echo file_get_contents($file);
     exit;
+}
+
+// Upload/Update email config
+if ($path === '/config/email' && $method === 'POST') {
+    if (!isset($_FILES['file'])) {
+        sendError('No file uploaded', 400);
+    }
+
+    $file = $_FILES['file'];
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        sendError('File upload failed', 400);
+    }
+
+    // Validate file is email.json
+    if ($file['name'] !== 'email.json') {
+        sendError('File must be named email.json', 400);
+    }
+
+    // Read and validate JSON
+    $content = file_get_contents($file['tmp_name']);
+    $data = json_decode($content, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        sendError('Invalid JSON: ' . json_last_error_msg(), 400);
+    }
+
+    // Validate required fields
+    if (!isset($data['from_email']) || !isset($data['from_name'])) {
+        sendError('Email config must contain from_email and from_name', 400);
+    }
+
+    // Save file
+    $targetFile = EDIT_BASE_PATH . '/config/email.json';
+    if (!move_uploaded_file($file['tmp_name'], $targetFile)) {
+        sendError('Failed to save file', 500);
+    }
+
+    sendJson([
+        'success' => true,
+        'message' => 'Email configuration saved successfully'
+    ]);
 }
 
 // Upload/Replace config file
@@ -476,6 +556,41 @@ if ($path === '/config/import' && $method === 'POST') {
     }
 
     $configPath = EDIT_BASE_PATH . '/config';
+
+    // Create backup before importing
+    $backupDir = $configPath . '/backups';
+    if (!is_dir($backupDir)) {
+        mkdir($backupDir, 0755, true);
+    }
+
+    $backupZip = new ZipArchive();
+    $backupFile = $backupDir . '/' . time() . '.zip';
+
+    if ($backupZip->open($backupFile, ZipArchive::CREATE) === true) {
+        // Add all current modules
+        if (is_dir($configPath . '/modules')) {
+            foreach (glob($configPath . '/modules/*.json') as $file) {
+                $backupZip->addFile($file, 'modules/' . basename($file));
+            }
+        }
+
+        // Add all current field groups
+        if (is_dir($configPath . '/field-groups')) {
+            foreach (glob($configPath . '/field-groups/*.json') as $file) {
+                $backupZip->addFile($file, 'field-groups/' . basename($file));
+            }
+        }
+
+        // Add all current blocks
+        if (is_dir($configPath . '/blocks')) {
+            foreach (glob($configPath . '/blocks/*.json') as $file) {
+                $backupZip->addFile($file, 'blocks/' . basename($file));
+            }
+        }
+
+        $backupZip->close();
+    }
+
     $errors = [];
     $imported = ['modules' => 0, 'field_groups' => 0, 'blocks' => 0];
 
@@ -527,18 +642,22 @@ if ($path === '/config/import' && $method === 'POST') {
     $registry->reload();
     $blocks->reload();
 
+    $backupFilename = basename($backupFile);
+
     if (!empty($errors)) {
         sendJson([
             'success' => true,
             'imported' => $imported,
             'errors' => $errors,
-            'message' => 'Import completed with some errors'
+            'backup' => $backupFilename,
+            'message' => 'Import completed with some errors. Backup saved to: ' . $backupFilename
         ]);
     } else {
         sendJson([
             'success' => true,
             'imported' => $imported,
-            'message' => 'All configuration files imported successfully'
+            'backup' => $backupFilename,
+            'message' => 'All configuration files imported successfully. Backup saved to: ' . $backupFilename
         ]);
     }
 }
