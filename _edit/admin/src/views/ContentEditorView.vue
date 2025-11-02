@@ -50,7 +50,18 @@
           </div>
         </div>
 
-        <div v-if="assignedFieldGroups.length === 0" class="card bg-base-100 border shadow">
+        <!-- Flexible Content (if allow_open is true) -->
+        <div v-if="currentPostType?.allow_open" class="card bg-base-100 border shadow">
+          <div class="card-body">
+            <FlexibleContentField
+              v-model="form.fields.flexible_content"
+              :available-blocks="availableBlocks"
+              @selectMedia="(subFieldKey, item) => openMediaModal(subFieldKey, item)"
+            />
+          </div>
+        </div>
+
+        <div v-if="assignedFieldGroups.length === 0 && !currentPostType?.allow_open" class="card bg-base-100 border shadow">
           <div class="card-body items-center text-center py-16">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-16 h-16 opacity-40 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -91,6 +102,7 @@ import FieldRenderer from '../components/FieldRenderer.vue'
 import RepeaterField from '../components/RepeaterField.vue'
 import MediaModal from '../components/MediaModal.vue'
 import ContentMetadata from '../components/ContentMetadata.vue'
+import FlexibleContentField from '../components/FlexibleContentField.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -115,6 +127,7 @@ const toastMessage = ref('')
 const currentMediaTarget = ref(null) // For repeater items
 
 const relationshipData = ref({})
+const availableBlocks = ref([])
 
 const isCreating = computed(() => !currentId.value)
 
@@ -142,8 +155,14 @@ async function loadContentItem() {
       fields: { ...(item.fields || {}) }
     }
 
-    // Load media items so media fields can display correctly
+    // Ensure flexible_content exists if post type allows it
+    if (currentPostType.value?.allow_open && !form.value.fields.flexible_content) {
+      form.value.fields.flexible_content = []
+    }
+
+    // Load media items and blocks so they can display correctly
     await loadMedia()
+    await loadBlocks()
   } catch (error) {
     console.error('Failed to load content item:', error)
   }
@@ -158,14 +177,20 @@ async function resetForm() {
     })
   })
 
+  // Initialize flexible content field if post type allows it
+  if (currentPostType.value?.allow_open) {
+    initializedFields.flexible_content = []
+  }
+
   form.value = {
     slug: '',
     status: 'draft',
     fields: initializedFields
   }
 
-  // Load media items so media fields can display correctly
+  // Load media items and blocks so they can display correctly
   await loadMedia()
+  await loadBlocks()
 }
 
 async function saveContent() {
@@ -317,6 +342,16 @@ async function loadRelationshipItems(postType) {
   } catch (error) {
     console.error(`Failed to load ${postType}:`, error)
     relationshipData.value[postType] = []
+  }
+}
+
+// Block functions
+async function loadBlocks() {
+  try {
+    availableBlocks.value = await apiRequest('GET', '/blocks')
+  } catch (error) {
+    console.error('Failed to load blocks:', error)
+    availableBlocks.value = []
   }
 }
 

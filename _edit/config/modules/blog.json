@@ -6,7 +6,7 @@
       "label_plural": "Posts",
       "description": "Blog posts and articles",
       "icon": "file-text",
-      "allow_open": false
+      "allow_open": true
     }
   ],
   "field_groups": [

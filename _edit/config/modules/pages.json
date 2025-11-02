@@ -6,7 +6,7 @@
       "label_plural": "Pages",
       "description": "Static pages",
       "icon": "file",
-      "allow_open": false
+      "allow_open": true
     }
   ],
   "field_groups": [
