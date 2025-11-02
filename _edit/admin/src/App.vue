@@ -1,6 +1,14 @@
 <template>
+  <!-- Loading Screen -->
+  <div v-if="checkingAuth" class="hero min-h-screen bg-base-200">
+    <div class="flex flex-col items-center gap-4">
+      <span class="loading loading-spinner loading-lg"></span>
+      <p class="text-sm opacity-60">Loading...</p>
+    </div>
+  </div>
+
   <!-- Login Screen -->
-  <div v-if="!isAuthenticated" class="hero min-h-screen bg-base-200">
+  <div v-else-if="!isAuthenticated" class="hero min-h-screen bg-base-200">
     <div class="hero-content">
       <div class="card w-96 bg-base-100 shadow-xl">
         <div class="card-body gap-4">
@@ -69,19 +77,19 @@
         <span class="text-xl font-bold">_edit</span>
       </div>
       <div class="flex-none gap-2">
-        <button @click="navigate('media')" class="btn btn-ghost btn-sm gap-2" :class="{ 'btn-active': currentView === 'media' }">
+        <button @click="router.push('/media')" class="btn btn-ghost btn-sm gap-2" :class="{ 'btn-active': route.name === 'media' }">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
           <span class="hidden sm:inline">Media</span>
         </button>
-        <button @click="navigate('users')" class="btn btn-ghost btn-sm gap-2" :class="{ 'btn-active': currentView === 'users' }">
+        <button @click="router.push('/users')" class="btn btn-ghost btn-sm gap-2" :class="{ 'btn-active': route.name === 'users' }">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
           </svg>
           <span class="hidden sm:inline">Users</span>
         </button>
-        <button @click="navigate('config')" class="btn btn-ghost btn-sm gap-2" :class="{ 'btn-active': currentView === 'config' }">
+        <button @click="router.push('/config')" class="btn btn-ghost btn-sm gap-2" :class="{ 'btn-active': route.name === 'config' }">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
@@ -117,9 +125,9 @@
     <div class="bg-base-100 border-b overflow-x-auto">
       <div class="tabs tabs-boxed bg-transparent mx-4 gap-1 flex-nowrap min-w-max">
         <a v-for="postType in postTypes" :key="postType.key"
-           @click="navigate('content-list', postType.key)"
+           @click="router.push(`/${postType.key}`)"
            class="tab whitespace-nowrap"
-           :class="{ 'tab-active': (currentView === 'content-list' || currentView === 'content-edit') && currentType === postType.key }">
+           :class="{ 'tab-active': route.params.type === postType.key }">
           {{ postType.label_plural }}
         </a>
       </div>
@@ -127,28 +135,23 @@
 
     <!-- Page Content -->
     <main class="flex-1 overflow-y-auto bg-base-200 p-4 md:p-6 lg:p-8">
-      <component :is="currentComponent"
-                 :currentType="currentType"
-                 :currentId="currentId"
-                 :postTypes="postTypes"
-                 :fieldGroups="fieldGroups"
-                 @navigate="navigate"
-                 @reload="loadData" />
+      <router-view
+        :postTypes="postTypes"
+        :fieldGroups="fieldGroups"
+        @reload="loadData" />
     </main>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from './composables/useAuth'
 import { useApi } from './composables/useApi'
 
-// Components
-import ConfigView from './views/ConfigView.vue'
-import ContentListView from './views/ContentListView.vue'
-import ContentEditorView from './views/ContentEditorView.vue'
-import MediaView from './views/MediaView.vue'
-import UsersView from './views/UsersView.vue'
+// Router
+const router = useRouter()
+const route = useRoute()
 
 // Auth
 const { user, isAuthenticated, isFirstTimeSetup, checkFirstTimeSetup, verifyAuth, login, register, logout } = useAuth()
@@ -159,6 +162,7 @@ const loginForm = ref({ email: '', password: '' })
 const registerForm = ref({ name: '', email: '', password: '' })
 const showRegister = ref(false)
 const authError = ref(null)
+const checkingAuth = ref(true) // Loading state while checking authentication
 
 // Theme
 const isDarkMode = ref(false)
@@ -167,28 +171,8 @@ const isDarkMode = ref(false)
 const postTypes = ref([])
 const fieldGroups = ref([])
 
-// Navigation
-const currentView = ref('config')
-const currentType = ref(null)
-const currentId = ref(null)
-
-const currentComponent = computed(() => {
-  switch (currentView.value) {
-    case 'config':
-      return ConfigView
-    case 'content-list':
-      return ContentListView
-    case 'content-edit':
-    case 'content-create':
-      return ContentEditorView
-    case 'media':
-      return MediaView
-    case 'users':
-      return UsersView
-    default:
-      return ConfigView
-  }
-})
+// Current state from route
+const currentType = computed(() => route.params.type || null)
 
 // Methods
 async function handleLogin() {
@@ -215,7 +199,7 @@ async function handleRegister() {
 
 function handleLogout() {
   logout()
-  currentView.value = 'post-types'
+  router.push('/config')
 }
 
 async function loadPostTypes() {
@@ -239,12 +223,6 @@ async function loadData() {
   await loadFieldGroups()
 }
 
-function navigate(view, type = null, id = null) {
-  currentView.value = view
-  currentType.value = type
-  currentId.value = id
-}
-
 function toggleTheme() {
   isDarkMode.value = !isDarkMode.value
   const theme = isDarkMode.value ? 'dark' : 'light'
@@ -263,12 +241,15 @@ async function init() {
   if (isAuthenticated.value) {
     await loadData()
 
-    // Navigate to first post type or configuration
-    if (postTypes.value.length > 0) {
-      navigate('content-list', postTypes.value[0].key)
-    } else {
-      navigate('config')
+    // Only redirect to default if user is on root path
+    if (route.path === '/' || route.path === '') {
+      if (postTypes.value.length > 0) {
+        router.push(`/${postTypes.value[0].key}`)
+      } else {
+        router.push('/config')
+      }
     }
+    // Otherwise stay on current route
   }
 }
 
@@ -280,11 +261,13 @@ onMounted(async () => {
 
   if (isFirstTimeSetup.value) {
     showRegister.value = true
+    checkingAuth.value = false
   } else {
     const authenticated = await verifyAuth()
     if (authenticated) {
       await init()
     }
+    checkingAuth.value = false
   }
 })
 </script>

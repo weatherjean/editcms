@@ -84,6 +84,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useApi } from '../composables/useApi'
 import Toast from '../components/Toast.vue'
 import FieldRenderer from '../components/FieldRenderer.vue'
@@ -91,10 +92,14 @@ import RepeaterField from '../components/RepeaterField.vue'
 import MediaModal from '../components/MediaModal.vue'
 import ContentMetadata from '../components/ContentMetadata.vue'
 
-const props = defineProps(['currentType', 'currentId', 'postTypes', 'fieldGroups'])
-const emit = defineEmits(['navigate'])
+const router = useRouter()
+const route = useRoute()
+const props = defineProps(['postTypes', 'fieldGroups'])
 
 const { apiRequest } = useApi()
+
+const currentType = computed(() => route.params.type)
+const currentId = computed(() => route.params.id || null)
 
 const form = ref({
   slug: '',
@@ -111,25 +116,25 @@ const currentMediaTarget = ref(null) // For repeater items
 
 const relationshipData = ref({})
 
-const isCreating = computed(() => !props.currentId)
+const isCreating = computed(() => !currentId.value)
 
 const currentPostType = computed(() => {
-  return props.postTypes.find(pt => pt.key === props.currentType)
+  return props.postTypes.find(pt => pt.key === currentType.value)
 })
 
 const assignedFieldGroups = computed(() => {
-  if (!props.currentType || !props.fieldGroups) return []
+  if (!currentType.value || !props.fieldGroups) return []
 
   return props.fieldGroups.filter(fg => {
-    return fg.locations && fg.locations.includes(props.currentType)
+    return fg.locations && fg.locations.includes(currentType.value)
   })
 })
 
 async function loadContentItem() {
-  if (!props.currentId || !props.currentType) return
+  if (!currentId.value || !currentType.value) return
 
   try {
-    const item = await apiRequest('GET', `/${props.currentType}/${props.currentId}`)
+    const item = await apiRequest('GET', `/${currentType.value}/${currentId.value}`)
 
     form.value = {
       slug: item.slug || '',
@@ -167,8 +172,8 @@ async function saveContent() {
   try {
     const method = isCreating.value ? 'POST' : 'PUT'
     const url = isCreating.value
-      ? `/${props.currentType}`
-      : `/${props.currentType}/${props.currentId}`
+      ? `/${currentType.value}`
+      : `/${currentType.value}/${currentId.value}`
 
     // Normalize media fields: convert full media objects to IDs before saving
     const normalizedForm = { ...form.value }
@@ -180,7 +185,7 @@ async function saveContent() {
 
     // If creating, navigate to edit mode with the new ID
     if (isCreating.value && result.id) {
-      emit('navigate', 'content-edit', props.currentType, result.id)
+      router.push(`/${currentType.value}/${result.id}`)
     } else {
       // Reload the content to get updated data
       await loadContentItem()
@@ -230,7 +235,7 @@ function displayToast(message) {
 }
 
 function goBack() {
-  emit('navigate', 'content-list', props.currentType)
+  router.push(`/${currentType.value}`)
 }
 
 // Media functions
@@ -316,7 +321,7 @@ async function loadRelationshipItems(postType) {
 }
 
 // Watch for changes
-watch(() => props.currentId, async () => {
+watch(currentId, async () => {
   if (isCreating.value) {
     await resetForm()
   } else {

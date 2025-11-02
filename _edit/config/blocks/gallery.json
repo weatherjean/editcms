@@ -1,0 +1,38 @@
+{
+  "key": "gallery",
+  "label": "Image Gallery",
+  "description": "Collection of images with captions",
+  "icon": "🖼️",
+  "fields": [
+    {
+      "key": "title",
+      "label": "Gallery Title",
+      "type": "text",
+      "instructions": "Optional title for the gallery",
+      "required": false
+    },
+    {
+      "key": "images",
+      "label": "Images",
+      "type": "repeater",
+      "instructions": "Add images to the gallery",
+      "required": true,
+      "config": {
+        "fields": [
+          {
+            "key": "image",
+            "label": "Image",
+            "type": "media",
+            "required": true
+          },
+          {
+            "key": "caption",
+            "label": "Caption",
+            "type": "text",
+            "required": false
+          }
+        ]
+      }
+    }
+  ]
+}

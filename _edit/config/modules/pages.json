@@ -1,0 +1,42 @@
+{
+  "post_types": [
+    {
+      "key": "page",
+      "label": "Page",
+      "label_plural": "Pages",
+      "description": "Static pages",
+      "icon": "file",
+      "allow_open": false
+    }
+  ],
+  "field_groups": [
+    {
+      "key": "page_settings",
+      "title": "Page Settings",
+      "description": "Additional settings for pages",
+      "locations": ["page"],
+      "fields": [
+        {
+          "key": "show_in_menu",
+          "label": "Show in Menu",
+          "type": "boolean",
+          "instructions": "Display this page in navigation menus",
+          "required": false,
+          "default_value": true
+        },
+        {
+          "key": "menu_order",
+          "label": "Menu Order",
+          "type": "number",
+          "instructions": "Order in menu (lower numbers first)",
+          "required": false,
+          "default_value": 0,
+          "config": {
+            "min": 0,
+            "step": 1
+          }
+        }
+      ]
+    }
+  ]
+}

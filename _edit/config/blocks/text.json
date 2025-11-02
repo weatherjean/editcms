@@ -1,0 +1,15 @@
+{
+  "key": "text",
+  "label": "Text Block",
+  "description": "Rich text content block",
+  "icon": "📝",
+  "fields": [
+    {
+      "key": "content",
+      "label": "Content",
+      "type": "wysiwyg",
+      "instructions": "Rich text content",
+      "required": true
+    }
+  ]
+}

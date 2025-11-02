@@ -1,0 +1,46 @@
+{
+  "key": "hero",
+  "label": "Hero Section",
+  "description": "Large hero banner with image and text",
+  "icon": "🎯",
+  "fields": [
+    {
+      "key": "heading",
+      "label": "Heading",
+      "type": "text",
+      "instructions": "Main headline",
+      "required": true
+    },
+    {
+      "key": "subheading",
+      "label": "Subheading",
+      "type": "text",
+      "instructions": "Secondary text below heading",
+      "required": false
+    },
+    {
+      "key": "background_image",
+      "label": "Background Image",
+      "type": "media",
+      "instructions": "Large background image",
+      "required": false,
+      "config": {
+        "multiple": false
+      }
+    },
+    {
+      "key": "cta_text",
+      "label": "Button Text",
+      "type": "text",
+      "instructions": "Call-to-action button label",
+      "required": false
+    },
+    {
+      "key": "cta_link",
+      "label": "Button Link",
+      "type": "text",
+      "instructions": "URL for the button",
+      "required": false
+    }
+  ]
+}

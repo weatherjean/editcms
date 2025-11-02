@@ -69,24 +69,28 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useApi } from '../composables/useApi'
 
-const props = defineProps(['currentType', 'postTypes'])
-const emit = defineEmits(['navigate'])
+const router = useRouter()
+const route = useRoute()
+const props = defineProps(['postTypes'])
 
 const { apiRequest } = useApi()
 
 const contentItems = ref([])
 
+const currentType = computed(() => route.params.type)
+
 const currentPostType = computed(() => {
-  return props.postTypes.find(pt => pt.key === props.currentType)
+  return props.postTypes.find(pt => pt.key === currentType.value)
 })
 
 async function loadContent() {
-  if (!props.currentType) return
+  if (!currentType.value) return
 
   try {
-    contentItems.value = await apiRequest('GET', `/${props.currentType}`)
+    contentItems.value = await apiRequest('GET', `/${currentType.value}`)
   } catch (error) {
     console.error('Failed to load content:', error)
     contentItems.value = []
@@ -94,18 +98,18 @@ async function loadContent() {
 }
 
 function createContent() {
-  emit('navigate', 'content-create', props.currentType)
+  router.push(`/${currentType.value}/create`)
 }
 
 function editContent(id) {
-  emit('navigate', 'content-edit', props.currentType, id)
+  router.push(`/${currentType.value}/${id}`)
 }
 
 async function deleteContent(id) {
   if (!confirm('Delete this item?')) return
 
   try {
-    await apiRequest('DELETE', `/${props.currentType}/${id}`)
+    await apiRequest('DELETE', `/${currentType.value}/${id}`)
     await loadContent()
   } catch (error) {
     alert('Failed to delete: ' + error.message)
@@ -118,7 +122,7 @@ function formatDate(dateString) {
 }
 
 // Watch for type changes
-watch(() => props.currentType, () => {
+watch(currentType, () => {
   loadContent()
 }, { immediate: true })
 

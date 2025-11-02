@@ -1,0 +1,32 @@
+{
+  "key": "seo",
+  "title": "SEO Settings",
+  "description": "Search engine optimization fields",
+  "locations": ["post", "page"],
+  "fields": [
+    {
+      "key": "meta_title",
+      "label": "Meta Title",
+      "type": "text",
+      "instructions": "Custom title for search engines (leave empty to use post title)",
+      "required": false
+    },
+    {
+      "key": "meta_description",
+      "label": "Meta Description",
+      "type": "textarea",
+      "instructions": "Brief description for search results (150-160 characters)",
+      "required": false
+    },
+    {
+      "key": "og_image",
+      "label": "Social Share Image",
+      "type": "media",
+      "instructions": "Image shown when shared on social media",
+      "required": false,
+      "config": {
+        "multiple": false
+      }
+    }
+  ]
+}

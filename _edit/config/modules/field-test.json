@@ -1,100 +1,20 @@
 {
   "post_types": [
     {
-      "key": "post",
-      "label": "Post",
-      "label_plural": "Posts",
-      "description": "Blog posts and articles",
-      "icon": "file-text"
-    },
-    {
-      "key": "page",
-      "label": "Page",
-      "label_plural": "Pages",
-      "description": "Static pages",
-      "icon": "file"
-    },
-    {
       "key": "field_test",
       "label": "Field Test",
       "label_plural": "Field Tests",
       "description": "Test all 12 field types",
-      "icon": "settings"
+      "icon": "settings",
+      "allow_open": false
     }
   ],
   "field_groups": [
     {
-      "key": "post_content",
-      "title": "Post Content",
-      "description": "Main content fields for posts",
-      "locations": [
-        "post"
-      ],
-      "fields": [
-        {
-          "key": "excerpt",
-          "label": "Excerpt",
-          "type": "textarea",
-          "instructions": "Short summary of the post",
-          "required": false,
-          "default_value": ""
-        },
-        {
-          "key": "featured_image",
-          "label": "Featured Image",
-          "type": "media",
-          "instructions": "Main image for the post",
-          "required": false,
-          "config": {
-            "multiple": false
-          }
-        },
-        {
-          "key": "published_at",
-          "label": "Publish Date",
-          "type": "datetime",
-          "instructions": "When to publish this post",
-          "required": false
-        }
-      ]
-    },
-    {
-      "key": "page_settings",
-      "title": "Page Settings",
-      "description": "Additional settings for pages",
-      "locations": [
-        "page"
-      ],
-      "fields": [
-        {
-          "key": "show_in_menu",
-          "label": "Show in Menu",
-          "type": "boolean",
-          "instructions": "Display this page in navigation menus",
-          "required": false,
-          "default_value": true
-        },
-        {
-          "key": "menu_order",
-          "label": "Menu Order",
-          "type": "number",
-          "instructions": "Order in menu (lower numbers first)",
-          "required": false,
-          "default_value": 0,
-          "config": {
-            "min": 0,
-            "step": 1
-          }
-        }
-      ]
-    },
-    {
       "key": "all_fields",
       "title": "All Field Types",
       "description": "Test all 12 field types",
-      "locations": [
-        "field_test"
-      ],
+      "locations": ["field_test"],
       "fields": [
         {
           "key": "title",

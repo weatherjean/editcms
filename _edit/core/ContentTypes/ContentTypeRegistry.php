@@ -4,10 +4,21 @@ declare(strict_types=1);
 
 namespace Edit\Core\ContentTypes;
 
+/**
+ * ContentTypeRegistry - Loads and manages content types from modular config files
+ *
+ * Configuration structure:
+ * - modules/*.json: Post types with their specific field groups
+ * - field-groups/*.json: Shared/reusable field groups
+ * - blocks/*.json: Flexible content blocks (managed by BlockRegistry)
+ */
 class ContentTypeRegistry
 {
     private array $contentTypes = [];
+    private array $postTypes = [];
+    private array $fieldGroups = [];
     private string $configPath;
+    private bool $loaded = false;
 
     public function __construct(?string $configPath = null)
     {
@@ -15,32 +26,110 @@ class ContentTypeRegistry
     }
 
     /**
-     * Load content types from JSON config file
+     * Load content types from modular config files
      */
     public function load(): void
     {
+        if ($this->loaded) {
+            return;
+        }
+
         $this->contentTypes = [];
+        $this->postTypes = [];
+        $this->fieldGroups = [];
 
-        // Load config from single JSON file
-        $configFile = $this->configPath . '/config.json';
-        if (!file_exists($configFile)) {
-            throw new \RuntimeException("Config file not found: {$configFile}");
-        }
+        // Load modules (post types + their field groups)
+        $this->loadModules();
 
-        $config = json_decode(file_get_contents($configFile), true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \RuntimeException("Invalid JSON in config.json: " . json_last_error_msg());
-        }
-
-        $postTypes = $config['post_types'] ?? [];
-        $fieldGroups = $config['field_groups'] ?? [];
+        // Load shared field groups
+        $this->loadSharedFieldGroups();
 
         // Build content types from post types and field groups
-        foreach ($postTypes as $postType) {
-            $key = $postType['key'];
+        $this->buildContentTypes();
 
+        $this->loaded = true;
+    }
+
+    /**
+     * Load modules from modules/ directory
+     * Each module can contain post_types and field_groups
+     */
+    private function loadModules(): void
+    {
+        $modulesPath = $this->configPath . '/modules';
+
+        if (!is_dir($modulesPath)) {
+            return;
+        }
+
+        $files = glob($modulesPath . '/*.json');
+
+        foreach ($files as $file) {
+            $content = file_get_contents($file);
+            $module = json_decode($content, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                error_log("Failed to parse module file: {$file} - " . json_last_error_msg());
+                continue;
+            }
+
+            // Merge post types from this module
+            if (isset($module['post_types']) && is_array($module['post_types'])) {
+                foreach ($module['post_types'] as $postType) {
+                    if (isset($postType['key'])) {
+                        $this->postTypes[$postType['key']] = $postType;
+                    }
+                }
+            }
+
+            // Merge field groups from this module
+            if (isset($module['field_groups']) && is_array($module['field_groups'])) {
+                foreach ($module['field_groups'] as $fieldGroup) {
+                    if (isset($fieldGroup['key'])) {
+                        $this->fieldGroups[$fieldGroup['key']] = $fieldGroup;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Load shared field groups from field-groups/ directory
+     */
+    private function loadSharedFieldGroups(): void
+    {
+        $fieldGroupsPath = $this->configPath . '/field-groups';
+
+        if (!is_dir($fieldGroupsPath)) {
+            return;
+        }
+
+        $files = glob($fieldGroupsPath . '/*.json');
+
+        foreach ($files as $file) {
+            $content = file_get_contents($file);
+            $fieldGroup = json_decode($content, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                error_log("Failed to parse field group file: {$file} - " . json_last_error_msg());
+                continue;
+            }
+
+            if (isset($fieldGroup['key'])) {
+                // Shared field groups can override module field groups
+                $this->fieldGroups[$fieldGroup['key']] = $fieldGroup;
+            }
+        }
+    }
+
+    /**
+     * Build content types by combining post types with their field groups
+     */
+    private function buildContentTypes(): void
+    {
+        foreach ($this->postTypes as $key => $postType) {
             // Find all field groups assigned to this post type
-            $assignedFieldGroups = array_filter($fieldGroups, function ($group) use ($key) {
+            $assignedFieldGroups = array_filter($this->fieldGroups, function ($group) use ($key) {
                 return in_array($key, $group['locations'] ?? []);
             });
 
@@ -48,16 +137,17 @@ class ContentTypeRegistry
             $fields = [];
             foreach ($assignedFieldGroups as $group) {
                 foreach ($group['fields'] ?? [] as $field) {
-                    // Keep the entire field config to preserve nested structures (e.g., repeater fields)
                     $fields[$field['key']] = $field;
                 }
             }
 
             $this->contentTypes[$key] = [
+                'key' => $key,
                 'label' => $postType['label'],
                 'label_plural' => $postType['label_plural'],
                 'description' => $postType['description'] ?? '',
                 'icon' => $postType['icon'] ?? 'file',
+                'allow_open' => $postType['allow_open'] ?? false,
                 'fields' => $fields
             ];
         }
@@ -68,6 +158,10 @@ class ContentTypeRegistry
      */
     public function getAll(): array
     {
+        if (!$this->loaded) {
+            $this->load();
+        }
+
         return $this->contentTypes;
     }
 
@@ -76,6 +170,10 @@ class ContentTypeRegistry
      */
     public function get(string $type): ?array
     {
+        if (!$this->loaded) {
+            $this->load();
+        }
+
         return $this->contentTypes[$type] ?? null;
     }
 
@@ -84,6 +182,10 @@ class ContentTypeRegistry
      */
     public function exists(string $type): bool
     {
+        if (!$this->loaded) {
+            $this->load();
+        }
+
         return isset($this->contentTypes[$type]);
     }
 
@@ -92,6 +194,10 @@ class ContentTypeRegistry
      */
     public function getTypes(): array
     {
+        if (!$this->loaded) {
+            $this->load();
+        }
+
         return array_keys($this->contentTypes);
     }
 
@@ -114,45 +220,35 @@ class ContentTypeRegistry
     }
 
     /**
-     * Get raw config from JSON
-     */
-    public function getConfig(): array
-    {
-        $configFile = $this->configPath . '/config.json';
-        $config = json_decode(file_get_contents($configFile), true);
-        return $config ?? ['post_types' => [], 'field_groups' => []];
-    }
-
-    /**
-     * Get raw post types from JSON
+     * Get all post types (raw data from config)
      */
     public function getPostTypes(): array
     {
-        $config = $this->getConfig();
-        return $config['post_types'] ?? [];
+        if (!$this->loaded) {
+            $this->load();
+        }
+
+        return array_values($this->postTypes);
     }
 
     /**
-     * Get raw field groups from JSON
+     * Get all field groups (raw data from config)
      */
     public function getFieldGroups(): array
     {
-        $config = $this->getConfig();
-        return $config['field_groups'] ?? [];
+        if (!$this->loaded) {
+            $this->load();
+        }
+
+        return array_values($this->fieldGroups);
     }
 
     /**
-     * Save entire config to JSON
+     * Reload configuration from disk
      */
-    public function saveConfig(array $config): bool
+    public function reload(): void
     {
-        $configFile = $this->configPath . '/config.json';
-        $json = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \RuntimeException("Failed to encode config: " . json_last_error_msg());
-        }
-
-        return file_put_contents($configFile, $json) !== false;
+        $this->loaded = false;
+        $this->load();
     }
 }
