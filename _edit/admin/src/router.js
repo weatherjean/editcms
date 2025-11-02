@@ -4,7 +4,7 @@ import ContentListView from './views/ContentListView.vue'
 import ContentEditorView from './views/ContentEditorView.vue'
 import MediaView from './views/MediaView.vue'
 import UsersView from './views/UsersView.vue'
-import SettingsView from './views/SettingsView.vue'
+import EmailView from './views/EmailView.vue'
 
 const routes = [
   {
@@ -27,9 +27,9 @@ const routes = [
     component: UsersView
   },
   {
-    path: '/settings',
-    name: 'settings',
-    component: SettingsView
+    path: '/email',
+    name: 'email',
+    component: EmailView
   },
   {
     path: '/:type',

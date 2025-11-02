@@ -2,8 +2,8 @@
   <div class="space-y-6">
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-3xl font-bold">Settings</h1>
-        <p class="text-sm opacity-60 mt-1">Configure email and system settings</p>
+        <h1 class="text-3xl font-bold">Email</h1>
+        <p class="text-sm opacity-60 mt-1">Configure email settings and view send logs</p>
       </div>
     </div>
 
@@ -64,6 +64,65 @@
             <span>{{ message }}</span>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Email Logs -->
+    <div class="card bg-base-100 border shadow">
+      <div class="card-body">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="card-title">📊 Email Send Logs</h2>
+            <p class="text-sm opacity-60">Recent email send attempts</p>
+          </div>
+          <button @click="loadLogs" class="btn btn-sm gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+            Refresh
+          </button>
+        </div>
+
+        <div v-if="loadingLogs" class="flex justify-center py-8">
+          <span class="loading loading-spinner loading-md"></span>
+        </div>
+
+        <div v-else-if="emailLogs.length === 0" class="text-center py-8 text-base-content/60">
+          No email logs found. Send a test email to see it appear here.
+        </div>
+
+        <div v-else class="overflow-x-auto">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>To</th>
+                <th>Subject</th>
+                <th>Status</th>
+                <th>IP Address</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="log in emailLogs" :key="log.id">
+                <td class="text-sm">
+                  <div>{{ formatDate(log.created_at) }}</div>
+                  <div class="text-xs opacity-60">{{ formatTime(log.created_at) }}</div>
+                </td>
+                <td class="text-sm">{{ log.to_address }}</td>
+                <td class="text-sm">{{ log.subject }}</td>
+                <td>
+                  <span v-if="log.success" class="badge badge-success badge-sm">Success</span>
+                  <span v-else class="badge badge-error badge-sm" :title="log.error_message">Failed</span>
+                </td>
+                <td class="text-sm font-mono opacity-60">{{ log.ip_address || '-' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div v-if="logsTotal > emailLogs.length" class="text-center mt-4">
+          <p class="text-sm opacity-60">Showing {{ emailLogs.length }} of {{ logsTotal }} logs</p>
+        </div>
       </div>
     </div>
 
@@ -144,13 +203,14 @@ const testing = ref(false)
 const sending = ref(false)
 const testEmailDialog = ref(null)
 
+const emailLogs = ref([])
+const loadingLogs = ref(false)
+const logsTotal = ref(0)
+
 async function loadEmailSettings() {
   try {
-    const response = await fetch('/_edit/config/email.json')
-    if (response.ok) {
-      const data = await response.json()
-      emailConfig.value = data
-    }
+    const data = await apiRequest('GET', '/email-settings')
+    emailConfig.value = data
   } catch (error) {
     console.error('Failed to load email settings:', error)
   }
@@ -161,22 +221,7 @@ async function saveEmailSettings() {
   message.value = ''
 
   try {
-    const blob = new Blob([JSON.stringify(emailConfig.value, null, 2)], { type: 'application/json' })
-    const formData = new FormData()
-    formData.append('file', blob, 'email.json')
-
-    const response = await fetch('/_edit/api/config/email', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('edit_token')}`
-      },
-      body: formData
-    })
-
-    if (!response.ok) {
-      throw new Error('Failed to save settings')
-    }
-
+    await apiRequest('PUT', '/email-settings', emailConfig.value)
     message.value = 'Email settings saved successfully!'
     messageType.value = 'success'
   } catch (error) {
@@ -199,12 +244,23 @@ async function sendTestEmail() {
   sending.value = true
 
   try {
+    // Step 1: Get a token
+    const tokenResponse = await fetch('/_edit/api/send-email/token')
+    if (!tokenResponse.ok) {
+      throw new Error('Failed to get email token')
+    }
+    const tokenData = await tokenResponse.json()
+
+    // Step 2: Send email with token
     const response = await fetch('/_edit/api/send-email', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(testEmailData.value)
+      body: JSON.stringify({
+        ...testEmailData.value,
+        token: tokenData.token
+      })
     })
 
     const data = await response.json()
@@ -216,6 +272,9 @@ async function sendTestEmail() {
     message.value = 'Test email sent successfully!'
     messageType.value = 'success'
     closeTestEmailDialog()
+
+    // Reload logs to show the new send
+    loadLogs()
   } catch (error) {
     message.value = error.message || 'Failed to send test email'
     messageType.value = 'error'
@@ -224,7 +283,31 @@ async function sendTestEmail() {
   }
 }
 
+async function loadLogs() {
+  loadingLogs.value = true
+  try {
+    const data = await apiRequest('GET', '/email-logs?limit=50')
+    emailLogs.value = data.logs
+    logsTotal.value = data.total
+  } catch (error) {
+    console.error('Failed to load email logs:', error)
+  } finally {
+    loadingLogs.value = false
+  }
+}
+
+function formatDate(dateString) {
+  const date = new Date(dateString)
+  return date.toLocaleDateString()
+}
+
+function formatTime(dateString) {
+  const date = new Date(dateString)
+  return date.toLocaleTimeString()
+}
+
 onMounted(() => {
   loadEmailSettings()
+  loadLogs()
 })
 </script>

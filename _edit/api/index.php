@@ -67,6 +67,77 @@ function getJsonBody(): ?array
     return json_decode($body, true);
 }
 
+/**
+ * Rate limiting with exponential backoff
+ *
+ * @param Database $db Database instance
+ * @param string $endpoint Endpoint identifier (e.g., 'login', 'send-email-token')
+ * @param int $maxAttempts Maximum attempts allowed in the window
+ * @param int $windowMinutes Time window in minutes (default: 15)
+ * @return void Sends error response and exits if rate limited
+ */
+function checkRateLimit(Database $db, string $endpoint, int $maxAttempts = 10, int $windowMinutes = 15): void
+{
+    $ipAddress = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+
+    // Clean up old rate limit records (older than 1 hour)
+    $db->execute(
+        "DELETE FROM rate_limits WHERE window_start < datetime('now', '-1 hour') AND (locked_until IS NULL OR locked_until < datetime('now'))"
+    );
+
+    // Check if currently locked out
+    $lockCheck = $db->query(
+        "SELECT locked_until FROM rate_limits WHERE ip_address = ? AND endpoint = ? AND locked_until > datetime('now')",
+        [$ipAddress, $endpoint]
+    );
+
+    if (!empty($lockCheck)) {
+        $lockedUntil = new DateTime($lockCheck[0]['locked_until']);
+        $now = new DateTime();
+        $secondsRemaining = $lockedUntil->getTimestamp() - $now->getTimestamp();
+
+        sendError("Rate limit exceeded. Try again in " . ceil($secondsRemaining / 60) . " minutes.", 429);
+    }
+
+    // Get current attempts within window
+    $record = $db->query(
+        "SELECT id, attempts, window_start FROM rate_limits WHERE ip_address = ? AND endpoint = ? AND window_start > datetime('now', '-{$windowMinutes} minutes')",
+        [$ipAddress, $endpoint]
+    );
+
+    if (empty($record)) {
+        // First attempt in this window - create new record
+        $db->execute(
+            "INSERT INTO rate_limits (ip_address, endpoint, attempts, window_start) VALUES (?, ?, 1, datetime('now'))
+             ON CONFLICT(ip_address, endpoint) DO UPDATE SET attempts = 1, window_start = datetime('now'), locked_until = NULL",
+            [$ipAddress, $endpoint]
+        );
+    } else {
+        // Increment attempts
+        $currentAttempts = $record[0]['attempts'];
+
+        if ($currentAttempts >= $maxAttempts) {
+            // Calculate lockout duration with exponential backoff
+            // 1st violation: 1 minute, 2nd: 5 minutes, 3rd+: 15 minutes
+            $violations = floor($currentAttempts / $maxAttempts);
+            $lockoutMinutes = min(15, pow(5, min($violations, 2)));
+
+            $db->execute(
+                "UPDATE rate_limits SET locked_until = datetime('now', '+{$lockoutMinutes} minutes') WHERE id = ?",
+                [$record[0]['id']]
+            );
+
+            sendError("Rate limit exceeded. Locked out for {$lockoutMinutes} minutes.", 429);
+        } else {
+            // Increment counter
+            $db->execute(
+                "UPDATE rate_limits SET attempts = attempts + 1 WHERE id = ?",
+                [$record[0]['id']]
+            );
+        }
+    }
+}
+
 // Check if any users exist (for first-time setup detection)
 if ($path === '/auth/has-users' && $method === 'GET') {
     $users = $db->query("SELECT COUNT(*) as count FROM users");
@@ -78,6 +149,9 @@ if ($path === '/auth/login') {
     if ($method !== 'POST') {
         sendError('Method not allowed', 405);
     }
+
+    // Rate limit: 5 attempts per 15 minutes
+    checkRateLimit($db, 'login', 5, 15);
 
     $data = getJsonBody();
     if (!isset($data['email']) || !isset($data['password'])) {
@@ -96,6 +170,9 @@ if ($path === '/auth/register') {
     if ($method !== 'POST') {
         sendError('Method not allowed', 405);
     }
+
+    // Rate limit: 3 attempts per 15 minutes
+    checkRateLimit($db, 'register', 3, 15);
 
     // Only allow registration if no users exist (first-time setup)
     $users = $db->query("SELECT COUNT(*) as count FROM users");
@@ -213,7 +290,39 @@ if (preg_match('#^/users/(\d+)$#', $path, $matches) && $method === 'DELETE') {
 // EMAIL API (public - for contact forms)
 // ============================================
 
+// Generate single-use email token (valid for 30 seconds)
+if ($path === '/send-email/token' && $method === 'GET') {
+    // Rate limit: 10 tokens per hour
+    checkRateLimit($db, 'email-token', 10, 60);
+
+    // Clean up expired tokens as a side effect
+    $db->cleanupExpiredEmailTokens();
+
+    // Generate cryptographically secure token
+    $token = bin2hex(random_bytes(32));
+    $expiresAt = date('Y-m-d H:i:s', time() + 30); // 30 seconds from now
+
+    // Store token
+    $db->execute(
+        "INSERT INTO email_tokens (token, expires_at) VALUES (?, ?)",
+        [$token, $expiresAt]
+    );
+
+    sendJson([
+        'token' => $token,
+        'expires_at' => $expiresAt,
+        'expires_in' => 30
+    ]);
+}
+
+// Send email (requires valid single-use token)
 if ($path === '/send-email' && $method === 'POST') {
+    // Rate limit: 20 emails per hour (backup protection beyond tokens)
+    checkRateLimit($db, 'email-send', 20, 60);
+
+    // Clean up expired tokens as a side effect
+    $db->cleanupExpiredEmailTokens();
+
     $data = getJsonBody();
 
     // Validate required fields
@@ -221,13 +330,39 @@ if ($path === '/send-email' && $method === 'POST') {
         sendError('Missing required fields: to, subject, message', 400);
     }
 
-    // Load email configuration
-    $emailConfigFile = EDIT_BASE_PATH . '/config/email.json';
-    $emailConfig = ['from_email' => '', 'from_name' => ''];
-
-    if (file_exists($emailConfigFile)) {
-        $emailConfig = json_decode(file_get_contents($emailConfigFile), true);
+    // Validate token
+    if (!isset($data['token']) || empty($data['token'])) {
+        sendError('Missing email token. Call GET /send-email/token first.', 400);
     }
+
+    // Check token exists and is not expired
+    $tokenCheck = $db->query(
+        "SELECT expires_at FROM email_tokens WHERE token = ?",
+        [$data['token']]
+    );
+
+    if (empty($tokenCheck)) {
+        sendError('Invalid or already used email token', 403);
+    }
+
+    if (strtotime($tokenCheck[0]['expires_at']) < time()) {
+        sendError('Email token expired', 403);
+    }
+
+    // Delete token (single-use - delete immediately)
+    $db->execute(
+        "DELETE FROM email_tokens WHERE token = ?",
+        [$data['token']]
+    );
+
+    // Load email configuration from database
+    $fromEmail = $db->query("SELECT value FROM settings WHERE key = 'email_from_address'");
+    $fromName = $db->query("SELECT value FROM settings WHERE key = 'email_from_name'");
+
+    $emailConfig = [
+        'from_email' => $fromEmail[0]['value'] ?? '',
+        'from_name' => $fromName[0]['value'] ?? ''
+    ];
 
     // Create email instance
     $email = new Email($emailConfig['from_email'], $emailConfig['from_name']);
@@ -241,9 +376,21 @@ if ($path === '/send-email' && $method === 'POST') {
     $isHtml = $data['is_html'] ?? true;
     $success = $email->send($data['to'], $data['subject'], $data['message'], $isHtml);
 
+    // Get IP address for logging
+    $ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
+
+    // Log the email send attempt
     if ($success) {
+        $db->execute(
+            "INSERT INTO email_logs (to_address, subject, success, ip_address) VALUES (?, ?, 1, ?)",
+            [$data['to'], $data['subject'], $ipAddress]
+        );
         sendJson(['success' => true, 'message' => 'Email sent successfully']);
     } else {
+        $db->execute(
+            "INSERT INTO email_logs (to_address, subject, success, error_message, ip_address) VALUES (?, ?, 0, ?, ?)",
+            [$data['to'], $data['subject'], 'mail() function returned false', $ipAddress]
+        );
         sendError('Failed to send email', 500);
     }
 }
@@ -252,6 +399,80 @@ if ($path === '/send-email' && $method === 'POST') {
 $userId = $auth->verifyRequest();
 if (!$userId) {
     sendError('Unauthorized', 401);
+}
+
+// ============================================
+// EMAIL SETTINGS API (admin only)
+// ============================================
+
+// Get email settings
+if ($path === '/email-settings' && $method === 'GET') {
+    // Get settings from database
+    $fromEmail = $db->query("SELECT value FROM settings WHERE key = 'email_from_address'");
+    $fromName = $db->query("SELECT value FROM settings WHERE key = 'email_from_name'");
+
+    sendJson([
+        'from_email' => $fromEmail[0]['value'] ?? '',
+        'from_name' => $fromName[0]['value'] ?? ''
+    ]);
+}
+
+// Update email settings
+if ($path === '/email-settings' && $method === 'PUT') {
+    $data = getJsonBody();
+
+    if (!isset($data['from_email']) || !isset($data['from_name'])) {
+        sendError('from_email and from_name are required', 400);
+    }
+
+    // Validate email
+    if (!filter_var($data['from_email'], FILTER_VALIDATE_EMAIL)) {
+        sendError('Invalid email address', 400);
+    }
+
+    // Update or insert settings
+    $db->execute("
+        INSERT INTO settings (key, value, updated_at)
+        VALUES ('email_from_address', ?, datetime('now'))
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+    ", [$data['from_email']]);
+
+    $db->execute("
+        INSERT INTO settings (key, value, updated_at)
+        VALUES ('email_from_name', ?, datetime('now'))
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+    ", [$data['from_name']]);
+
+    sendJson([
+        'success' => true,
+        'message' => 'Email settings updated successfully'
+    ]);
+}
+
+// ============================================
+// EMAIL LOGS API (admin only)
+// ============================================
+
+// Get email logs
+if ($path === '/email-logs' && $method === 'GET') {
+    $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 50;
+    $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
+
+    $logs = $db->query(
+        "SELECT * FROM email_logs ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        [$limit, $offset]
+    );
+
+    // Get total count
+    $totalResult = $db->query("SELECT COUNT(*) as total FROM email_logs");
+    $total = $totalResult[0]['total'] ?? 0;
+
+    sendJson([
+        'logs' => $logs,
+        'total' => $total,
+        'limit' => $limit,
+        'offset' => $offset
+    ]);
 }
 
 // ============================================
@@ -374,46 +595,6 @@ if (preg_match('#^/config/(modules|field-groups|blocks)/([a-z0-9_-]+)$#', $path,
     header('Content-Disposition: attachment; filename="' . basename($file) . '"');
     echo file_get_contents($file);
     exit;
-}
-
-// Upload/Update email config
-if ($path === '/config/email' && $method === 'POST') {
-    if (!isset($_FILES['file'])) {
-        sendError('No file uploaded', 400);
-    }
-
-    $file = $_FILES['file'];
-    if ($file['error'] !== UPLOAD_ERR_OK) {
-        sendError('File upload failed', 400);
-    }
-
-    // Validate file is email.json
-    if ($file['name'] !== 'email.json') {
-        sendError('File must be named email.json', 400);
-    }
-
-    // Read and validate JSON
-    $content = file_get_contents($file['tmp_name']);
-    $data = json_decode($content, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        sendError('Invalid JSON: ' . json_last_error_msg(), 400);
-    }
-
-    // Validate required fields
-    if (!isset($data['from_email']) || !isset($data['from_name'])) {
-        sendError('Email config must contain from_email and from_name', 400);
-    }
-
-    // Save file
-    $targetFile = EDIT_BASE_PATH . '/config/email.json';
-    if (!move_uploaded_file($file['tmp_name'], $targetFile)) {
-        sendError('Failed to save file', 500);
-    }
-
-    sendJson([
-        'success' => true,
-        'message' => 'Email configuration saved successfully'
-    ]);
 }
 
 // Upload/Replace config file

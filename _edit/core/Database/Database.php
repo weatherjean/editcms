@@ -82,6 +82,72 @@ class Database
                 )
             ");
         }
+
+        // Check if email_tokens table exists
+        $emailTokensCheck = $this->query(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='email_tokens'"
+        );
+
+        if (empty($emailTokensCheck)) {
+            // Create email_tokens table for single-use email sending tokens
+            $this->execute("
+                CREATE TABLE IF NOT EXISTS email_tokens (
+                    token TEXT PRIMARY KEY,
+                    expires_at DATETIME NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+
+            // Add index for cleanup queries
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_email_tokens_expires ON email_tokens(expires_at)");
+        }
+
+        // Check if email_logs table exists
+        $emailLogsCheck = $this->query(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='email_logs'"
+        );
+
+        if (empty($emailLogsCheck)) {
+            // Create email_logs table to track all email sends
+            $this->execute("
+                CREATE TABLE IF NOT EXISTS email_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    to_address TEXT NOT NULL,
+                    subject TEXT NOT NULL,
+                    success INTEGER DEFAULT 0,
+                    error_message TEXT,
+                    ip_address TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+
+            // Add index for querying logs
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_email_logs_created ON email_logs(created_at DESC)");
+        }
+
+        // Check if rate_limits table exists
+        $rateLimitsCheck = $this->query(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='rate_limits'"
+        );
+
+        if (empty($rateLimitsCheck)) {
+            // Create rate_limits table for tracking request attempts
+            $this->execute("
+                CREATE TABLE IF NOT EXISTS rate_limits (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ip_address TEXT NOT NULL,
+                    endpoint TEXT NOT NULL,
+                    attempts INTEGER DEFAULT 1,
+                    window_start DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    locked_until DATETIME,
+                    UNIQUE(ip_address, endpoint)
+                )
+            ");
+
+            // Add indexes for rate limit queries
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_ip_endpoint ON rate_limits(ip_address, endpoint)");
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_window ON rate_limits(window_start)");
+        }
     }
 
     private function createSchema(): void
@@ -160,6 +226,48 @@ class Database
                 )
             ");
 
+            // Email tokens table - single-use tokens for email sending
+            $this->execute("
+                CREATE TABLE IF NOT EXISTS email_tokens (
+                    token TEXT PRIMARY KEY,
+                    expires_at DATETIME NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_email_tokens_expires ON email_tokens(expires_at)");
+
+            // Email logs table - track all email sends
+            $this->execute("
+                CREATE TABLE IF NOT EXISTS email_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    to_address TEXT NOT NULL,
+                    subject TEXT NOT NULL,
+                    success INTEGER DEFAULT 0,
+                    error_message TEXT,
+                    ip_address TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_email_logs_created ON email_logs(created_at DESC)");
+
+            // Rate limits table - track API request attempts
+            $this->execute("
+                CREATE TABLE IF NOT EXISTS rate_limits (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ip_address TEXT NOT NULL,
+                    endpoint TEXT NOT NULL,
+                    attempts INTEGER DEFAULT 1,
+                    window_start DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    locked_until DATETIME,
+                    UNIQUE(ip_address, endpoint)
+                )
+            ");
+
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_ip_endpoint ON rate_limits(ip_address, endpoint)");
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_window ON rate_limits(window_start)");
+
             $this->commit();
         } catch (PDOException $e) {
             $this->rollback();
@@ -232,5 +340,21 @@ class Database
     public function getPdo(): PDO
     {
         return $this->pdo;
+    }
+
+    /**
+     * Clean up expired email tokens
+     * This is called opportunistically as a side effect of email operations
+     */
+    public function cleanupExpiredEmailTokens(): void
+    {
+        try {
+            $this->execute(
+                "DELETE FROM email_tokens WHERE expires_at < datetime('now')"
+            );
+        } catch (\Exception $e) {
+            // Silently fail - this is a cleanup operation, not critical
+            // Log if you have logging system
+        }
     }
 }
