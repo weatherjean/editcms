@@ -94,6 +94,12 @@ if ($path === '/auth/register') {
         sendError('Method not allowed', 405);
     }
 
+    // Only allow registration if no users exist (first-time setup)
+    $users = $db->query("SELECT COUNT(*) as count FROM users");
+    if ($users[0]['count'] > 0) {
+        sendError('Registration is disabled. Please contact an administrator.', 403);
+    }
+
     $data = getJsonBody();
     if (!isset($data['email']) || !isset($data['password']) || !isset($data['name'])) {
         sendError('Email, password, and name required', 400);
@@ -118,6 +124,86 @@ if ($path === '/auth/me') {
 
     $user = $auth->getCurrentUser();
     sendJson(['user' => $user]);
+}
+
+// ============================================
+// USER MANAGEMENT API (requires auth)
+// ============================================
+
+// Get all users
+if ($path === '/users' && $method === 'GET') {
+    $userId = $auth->verifyRequest();
+    if (!$userId) {
+        sendError('Unauthorized', 401);
+    }
+
+    $users = $db->query("SELECT id, name, email, created_at FROM users ORDER BY created_at DESC");
+    sendJson($users);
+}
+
+// Create new user (admin only)
+if ($path === '/users' && $method === 'POST') {
+    $userId = $auth->verifyRequest();
+    if (!$userId) {
+        sendError('Unauthorized', 401);
+    }
+
+    $data = getJsonBody();
+    if (!isset($data['email']) || !isset($data['password']) || !isset($data['name'])) {
+        sendError('Email, password, and name required', 400);
+    }
+
+    try {
+        $newUserId = $auth->register($data['email'], $data['password'], $data['name']);
+        $newUser = $db->query("SELECT id, name, email, created_at FROM users WHERE id = ?", [$newUserId]);
+        sendJson($newUser[0]);
+    } catch (\Exception $e) {
+        sendError($e->getMessage(), 400);
+    }
+}
+
+// Update user password
+if (preg_match('#^/users/(\d+)$#', $path, $matches) && $method === 'PUT') {
+    $userId = $auth->verifyRequest();
+    if (!$userId) {
+        sendError('Unauthorized', 401);
+    }
+
+    $targetUserId = (int)$matches[1];
+    $data = getJsonBody();
+
+    if (!isset($data['password']) || empty($data['password'])) {
+        sendError('Password required', 400);
+    }
+
+    $passwordHash = password_hash($data['password'], PASSWORD_DEFAULT);
+    $db->execute("UPDATE users SET password_hash = ? WHERE id = ?", [$passwordHash, $targetUserId]);
+
+    sendJson(['success' => true, 'message' => 'Password updated successfully']);
+}
+
+// Delete user
+if (preg_match('#^/users/(\d+)$#', $path, $matches) && $method === 'DELETE') {
+    $userId = $auth->verifyRequest();
+    if (!$userId) {
+        sendError('Unauthorized', 401);
+    }
+
+    $targetUserId = (int)$matches[1];
+
+    // Prevent deleting yourself
+    if ($targetUserId === $userId) {
+        sendError('Cannot delete your own account', 400);
+    }
+
+    // Prevent deleting the last user
+    $userCount = $db->query("SELECT COUNT(*) as count FROM users");
+    if ($userCount[0]['count'] <= 1) {
+        sendError('Cannot delete the last user', 400);
+    }
+
+    $db->execute("DELETE FROM users WHERE id = ?", [$targetUserId]);
+    sendJson(['success' => true, 'message' => 'User deleted successfully']);
 }
 
 // Verify authentication for all other endpoints
