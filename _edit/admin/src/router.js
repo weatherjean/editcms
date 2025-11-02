@@ -5,6 +5,7 @@ import ContentEditorView from './views/ContentEditorView.vue'
 import MediaView from './views/MediaView.vue'
 import UsersView from './views/UsersView.vue'
 import EmailView from './views/EmailView.vue'
+import HealthView from './views/HealthView.vue'
 
 const routes = [
   {
@@ -30,6 +31,11 @@ const routes = [
     path: '/email',
     name: 'email',
     component: EmailView
+  },
+  {
+    path: '/health',
+    name: 'health',
+    component: HealthView
   },
   {
     path: '/:type',

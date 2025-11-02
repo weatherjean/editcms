@@ -144,6 +144,73 @@ if ($path === '/auth/has-users' && $method === 'GET') {
     sendJson(['has_users' => $users[0]['count'] > 0]);
 }
 
+// System health check (public, no auth)
+if ($path === '/health' && $method === 'GET') {
+    $checks = [];
+
+    // PHP version
+    $checks['php_version'] = [
+        'value' => PHP_VERSION,
+        'status' => version_compare(PHP_VERSION, '8.1.0', '>=') ? 'ok' : 'error',
+        'message' => version_compare(PHP_VERSION, '8.1.0', '>=') ? 'PHP 8.1+ ✓' : 'PHP 8.1+ required'
+    ];
+
+    // Required extensions
+    $requiredExtensions = ['sqlite3', 'pdo', 'json', 'fileinfo'];
+    $missingExtensions = [];
+    foreach ($requiredExtensions as $ext) {
+        if (!extension_loaded($ext)) {
+            $missingExtensions[] = $ext;
+        }
+    }
+    $checks['extensions'] = [
+        'value' => $missingExtensions,
+        'status' => empty($missingExtensions) ? 'ok' : 'error',
+        'message' => empty($missingExtensions) ? 'All required extensions loaded ✓' : 'Missing: ' . implode(', ', $missingExtensions)
+    ];
+
+    // Database writable
+    $dbDir = EDIT_BASE_PATH . '/database';
+    $checks['database_writable'] = [
+        'value' => is_writable($dbDir),
+        'status' => is_writable($dbDir) ? 'ok' : 'warning',
+        'message' => is_writable($dbDir) ? 'Database directory writable ✓' : 'Database directory not writable (may cause issues)'
+    ];
+
+    // Uploads writable
+    $uploadsDir = EDIT_BASE_PATH . '/uploads';
+    $checks['uploads_writable'] = [
+        'value' => is_writable($uploadsDir),
+        'status' => is_writable($uploadsDir) ? 'ok' : 'warning',
+        'message' => is_writable($uploadsDir) ? 'Uploads directory writable ✓' : 'Uploads directory not writable (media uploads will fail)'
+    ];
+
+    // Config writable
+    $configDir = EDIT_BASE_PATH . '/config';
+    $checks['config_writable'] = [
+        'value' => is_writable($configDir),
+        'status' => is_writable($configDir) ? 'ok' : 'warning',
+        'message' => is_writable($configDir) ? 'Config directory writable ✓' : 'Config directory not writable (can\'t save post types)'
+    ];
+
+    // Overall status
+    $hasErrors = false;
+    $hasWarnings = false;
+    foreach ($checks as $check) {
+        if ($check['status'] === 'error') $hasErrors = true;
+        if ($check['status'] === 'warning') $hasWarnings = true;
+    }
+
+    $overall = $hasErrors ? 'error' : ($hasWarnings ? 'warning' : 'ok');
+
+    sendJson([
+        'status' => $overall,
+        'checks' => $checks,
+        'message' => $hasErrors ? 'System has errors that need attention' :
+                     ($hasWarnings ? 'System is functional but has warnings' : 'All systems operational')
+    ]);
+}
+
 // Auth endpoints (no auth required)
 if ($path === '/auth/login') {
     if ($method !== 'POST') {
@@ -359,13 +426,31 @@ if ($path === '/send-email' && $method === 'POST') {
     $fromEmail = $db->query("SELECT value FROM settings WHERE key = 'email_from_address'");
     $fromName = $db->query("SELECT value FROM settings WHERE key = 'email_from_name'");
 
+    // Load SMTP configuration
+    $smtpHost = $db->query("SELECT value FROM settings WHERE key = 'smtp_host'");
+    $smtpPort = $db->query("SELECT value FROM settings WHERE key = 'smtp_port'");
+    $smtpUsername = $db->query("SELECT value FROM settings WHERE key = 'smtp_username'");
+    $smtpPassword = $db->query("SELECT value FROM settings WHERE key = 'smtp_password'");
+    $smtpEncryption = $db->query("SELECT value FROM settings WHERE key = 'smtp_encryption'");
+
+    $smtpConfig = null;
+    if (!empty($smtpHost[0]['value'] ?? '')) {
+        $smtpConfig = [
+            'host' => $smtpHost[0]['value'] ?? '',
+            'port' => $smtpPort[0]['value'] ?? 587,
+            'username' => $smtpUsername[0]['value'] ?? '',
+            'password' => $smtpPassword[0]['value'] ?? '',
+            'encryption' => $smtpEncryption[0]['value'] ?? 'tls'
+        ];
+    }
+
     $emailConfig = [
         'from_email' => $fromEmail[0]['value'] ?? '',
         'from_name' => $fromName[0]['value'] ?? ''
     ];
 
-    // Create email instance
-    $email = new Email($emailConfig['from_email'], $emailConfig['from_name']);
+    // Create email instance with SMTP config
+    $email = new Email($emailConfig['from_email'], $emailConfig['from_name'], $smtpConfig);
 
     // Allow overriding from address (if provided)
     if (isset($data['from_email'])) {
@@ -387,11 +472,12 @@ if ($path === '/send-email' && $method === 'POST') {
         );
         sendJson(['success' => true, 'message' => 'Email sent successfully']);
     } else {
+        $errorMessage = $email->getLastError() ?: 'Unknown error';
         $db->execute(
             "INSERT INTO email_logs (to_address, subject, success, error_message, ip_address) VALUES (?, ?, 0, ?, ?)",
-            [$data['to'], $data['subject'], 'mail() function returned false', $ipAddress]
+            [$data['to'], $data['subject'], $errorMessage, $ipAddress]
         );
-        sendError('Failed to send email', 500);
+        sendError('Failed to send email: ' . $errorMessage, 500);
     }
 }
 
@@ -411,9 +497,21 @@ if ($path === '/email-settings' && $method === 'GET') {
     $fromEmail = $db->query("SELECT value FROM settings WHERE key = 'email_from_address'");
     $fromName = $db->query("SELECT value FROM settings WHERE key = 'email_from_name'");
 
+    // Get SMTP settings
+    $smtpHost = $db->query("SELECT value FROM settings WHERE key = 'smtp_host'");
+    $smtpPort = $db->query("SELECT value FROM settings WHERE key = 'smtp_port'");
+    $smtpUsername = $db->query("SELECT value FROM settings WHERE key = 'smtp_username'");
+    $smtpPassword = $db->query("SELECT value FROM settings WHERE key = 'smtp_password'");
+    $smtpEncryption = $db->query("SELECT value FROM settings WHERE key = 'smtp_encryption'");
+
     sendJson([
         'from_email' => $fromEmail[0]['value'] ?? '',
-        'from_name' => $fromName[0]['value'] ?? ''
+        'from_name' => $fromName[0]['value'] ?? '',
+        'smtp_host' => $smtpHost[0]['value'] ?? '',
+        'smtp_port' => $smtpPort[0]['value'] ?? '587',
+        'smtp_username' => $smtpUsername[0]['value'] ?? '',
+        'smtp_password' => $smtpPassword[0]['value'] ?? '',
+        'smtp_encryption' => $smtpEncryption[0]['value'] ?? 'tls'
     ]);
 }
 
@@ -421,27 +519,43 @@ if ($path === '/email-settings' && $method === 'GET') {
 if ($path === '/email-settings' && $method === 'PUT') {
     $data = getJsonBody();
 
-    if (!isset($data['from_email']) || !isset($data['from_name'])) {
-        sendError('from_email and from_name are required', 400);
+    // Validate required fields
+    $required = ['from_email', 'from_name', 'smtp_host', 'smtp_port', 'smtp_username', 'smtp_password'];
+    foreach ($required as $field) {
+        if (!isset($data[$field]) || empty($data[$field])) {
+            sendError("{$field} is required", 400);
+        }
     }
 
     // Validate email
     if (!filter_var($data['from_email'], FILTER_VALIDATE_EMAIL)) {
-        sendError('Invalid email address', 400);
+        sendError('Invalid from_email address', 400);
     }
 
-    // Update or insert settings
-    $db->execute("
-        INSERT INTO settings (key, value, updated_at)
-        VALUES ('email_from_address', ?, datetime('now'))
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
-    ", [$data['from_email']]);
+    // Validate port
+    if (!is_numeric($data['smtp_port']) || $data['smtp_port'] < 1 || $data['smtp_port'] > 65535) {
+        sendError('Invalid smtp_port', 400);
+    }
 
-    $db->execute("
-        INSERT INTO settings (key, value, updated_at)
-        VALUES ('email_from_name', ?, datetime('now'))
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
-    ", [$data['from_name']]);
+    // Helper function to save setting
+    $saveSetting = function($key, $value) use ($db) {
+        $db->execute("
+            INSERT INTO settings (key, value, updated_at)
+            VALUES (?, ?, datetime('now'))
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+        ", [$key, $value]);
+    };
+
+    // Save basic email settings
+    $saveSetting('email_from_address', $data['from_email']);
+    $saveSetting('email_from_name', $data['from_name']);
+
+    // Save SMTP settings (required)
+    $saveSetting('smtp_host', $data['smtp_host']);
+    $saveSetting('smtp_port', $data['smtp_port']);
+    $saveSetting('smtp_username', $data['smtp_username']);
+    $saveSetting('smtp_password', $data['smtp_password']);
+    $saveSetting('smtp_encryption', $data['smtp_encryption'] ?? 'tls');
 
     sendJson([
         'success' => true,

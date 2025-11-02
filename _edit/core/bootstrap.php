@@ -38,9 +38,10 @@ spl_autoload_register(function ($class) {
     }
 });
 
-// Error reporting for development
+// Error reporting - disable display in production, log to file
 error_reporting(E_ALL);
-ini_set('display_errors', '1');
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
 
 // Timezone
 date_default_timezone_set('UTC');

@@ -1,38 +1,72 @@
-# Node modules
-node_modules/
+# Dependencies
 admin/node_modules/
 
-# Build output
-admin-dist/
-dist/
+# Build output (tracked - this is what gets deployed)
+# admin-dist/ should be committed for production
 
-# Database
+# Development build artifacts
+admin/dist/
+
+# Database - never commit production data
 database/*.sqlite
 database/*.db
+database/*.sqlite-journal
+database/*.sqlite-wal
+database/*.sqlite-shm
 
-# Environment
+# Environment files
 .env
 .env.local
+.env.*.local
+
+# Config backups - auto-generated
+config/backups/
+
+# Uploads - user content, not tracked
+uploads/*
+!uploads/.gitkeep
+!uploads/**/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+error.log
+access.log
 
 # OS files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Thumbs.db:encryptable
+Desktop.ini
 
-# IDE
+# IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# Logs
-*.log
-npm-debug.log*
-
-# Uploads (optional - remove if you want to track uploads)
-uploads/
+.project
+.classpath
+.settings/
+*.sublime-*
 
 # Temporary files
 *.tmp
+*.temp
 *.bak
 *.old
+*.cache
+
+# Security - JWT secret now stored in database, but keep this for old installs
+config/jwt-secret.txt
+
+# PHP
+vendor/
+composer.lock

@@ -40,6 +40,73 @@
             <p class="text-xs opacity-60 mt-1">The name that appears as the sender</p>
           </fieldset>
 
+          <!-- SMTP Configuration -->
+          <div class="divider">SMTP Configuration (Required)</div>
+
+          <p class="text-sm opacity-60 -mt-2 mb-4">SMTP is required for email delivery. Get credentials from your email service provider (Gmail, SendGrid, Mailgun, etc.)</p>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">SMTP Host</legend>
+            <input
+              type="text"
+              v-model="emailConfig.smtp_host"
+              required
+              class="input w-full"
+              placeholder="smtp.example.com"
+            />
+            <p class="text-xs opacity-60 mt-1">SMTP server hostname (e.g., smtp.gmail.com, smtp.sendgrid.net)</p>
+          </fieldset>
+
+          <div class="grid grid-cols-2 gap-4">
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">SMTP Port</legend>
+              <input
+                type="number"
+                v-model="emailConfig.smtp_port"
+                required
+                class="input w-full"
+                placeholder="587"
+              />
+              <p class="text-xs opacity-60 mt-1">Usually 587 (TLS) or 465 (SSL)</p>
+            </fieldset>
+
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">Encryption</legend>
+              <select v-model="emailConfig.smtp_encryption" required class="select w-full">
+                <option value="tls">TLS</option>
+                <option value="ssl">SSL</option>
+                <option value="">None</option>
+              </select>
+              <p class="text-xs opacity-60 mt-1">Recommended: TLS</p>
+            </fieldset>
+          </div>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">SMTP Username</legend>
+            <input
+              type="text"
+              v-model="emailConfig.smtp_username"
+              required
+              class="input w-full"
+              placeholder="username or email"
+              autocomplete="off"
+            />
+            <p class="text-xs opacity-60 mt-1">SMTP authentication username</p>
+          </fieldset>
+
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">SMTP Password</legend>
+            <input
+              type="password"
+              v-model="emailConfig.smtp_password"
+              required
+              class="input w-full"
+              placeholder="••••••••"
+              autocomplete="new-password"
+            />
+            <p class="text-xs opacity-60 mt-1">SMTP authentication password</p>
+          </fieldset>
+
           <div class="flex gap-2">
             <button type="submit" class="btn btn-primary" :disabled="saving">
               <span v-if="saving" class="loading loading-spinner loading-sm"></span>
@@ -187,7 +254,12 @@ const { apiRequest } = useApi()
 
 const emailConfig = ref({
   from_email: '',
-  from_name: ''
+  from_name: '',
+  smtp_host: '',
+  smtp_port: '587',
+  smtp_username: '',
+  smtp_password: '',
+  smtp_encryption: 'tls'
 })
 
 const testEmailData = ref({

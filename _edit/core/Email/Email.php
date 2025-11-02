@@ -5,14 +5,17 @@ namespace Edit\Core\Email;
 class Email {
     private string $fromEmail;
     private string $fromName;
+    private ?array $smtpConfig;
+    private string $lastError = '';
 
-    public function __construct(string $fromEmail = '', string $fromName = '') {
+    public function __construct(string $fromEmail = '', string $fromName = '', ?array $smtpConfig = null) {
         $this->fromEmail = $fromEmail;
         $this->fromName = $fromName;
+        $this->smtpConfig = $smtpConfig;
     }
 
     /**
-     * Send an email using PHP's built-in mail() function
+     * Send an email using SMTP
      *
      * @param string|array $to Recipient email(s)
      * @param string $subject Email subject
@@ -21,43 +24,50 @@ class Email {
      * @return bool Success status
      */
     public function send($to, string $subject, string $message, bool $isHtml = true): bool {
-        // Handle array of recipients
-        $toAddress = is_array($to) ? implode(', ', $to) : $to;
+        // Check if SMTP is configured
+        if (!$this->isSmtpConfigured()) {
+            $this->lastError = 'SMTP is not configured. Please configure SMTP settings in the Email page.';
+            return false;
+        }
 
-        // Build headers
-        $headers = $this->buildHeaders($isHtml);
+        try {
+            $smtp = new SMTP(
+                $this->smtpConfig['host'],
+                (int)$this->smtpConfig['port'],
+                $this->smtpConfig['username'],
+                $this->smtpConfig['password'],
+                $this->smtpConfig['encryption'] ?? 'tls'
+            );
 
-        // Send email
-        return mail($toAddress, $subject, $message, $headers);
+            $toAddress = is_array($to) ? $to[0] : $to; // SMTP class handles single recipient
+            $success = $smtp->send($this->fromEmail, $this->fromName, $toAddress, $subject, $message, $isHtml);
+
+            if (!$success) {
+                $this->lastError = $smtp->getLastError();
+            }
+
+            return $success;
+        } catch (\Exception $e) {
+            $this->lastError = $e->getMessage();
+            return false;
+        }
     }
 
     /**
-     * Build email headers
+     * Get the last error message
      */
-    private function buildHeaders(bool $isHtml): string {
-        $headers = [];
+    public function getLastError(): string {
+        return $this->lastError;
+    }
 
-        // From header
-        if ($this->fromEmail) {
-            if ($this->fromName) {
-                $headers[] = "From: {$this->fromName} <{$this->fromEmail}>";
-            } else {
-                $headers[] = "From: {$this->fromEmail}";
-            }
-        }
-
-        // Content type
-        if ($isHtml) {
-            $headers[] = "MIME-Version: 1.0";
-            $headers[] = "Content-Type: text/html; charset=UTF-8";
-        } else {
-            $headers[] = "Content-Type: text/plain; charset=UTF-8";
-        }
-
-        // Additional headers for better deliverability
-        $headers[] = "X-Mailer: PHP/" . phpversion();
-
-        return implode("\r\n", $headers);
+    /**
+     * Check if SMTP is properly configured
+     */
+    private function isSmtpConfigured(): bool {
+        return !empty($this->smtpConfig['host']) &&
+               !empty($this->smtpConfig['port']) &&
+               !empty($this->smtpConfig['username']) &&
+               !empty($this->smtpConfig['password']);
     }
 
     /**
