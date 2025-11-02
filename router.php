@@ -35,10 +35,10 @@ if (!preg_match('#^/_edit/#', $uri)) {
 $file_uri = preg_replace('#^/_edit#', '', $uri);
 $file_path = __DIR__ . '/_edit' . $file_uri;
 
-// Special handling for API requests - route everything to api/index.php
+// Special handling for API requests - route everything to admin/api/index.php
 if (preg_match('#^/_edit/api/#', $uri)) {
     $_SERVER['REQUEST_URI'] = $uri; // Keep original URI for api/index.php
-    require __DIR__ . '/_edit/api/index.php';
+    require __DIR__ . '/_edit/admin/api/index.php';
     exit;
 }
 

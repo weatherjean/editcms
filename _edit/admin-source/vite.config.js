@@ -10,7 +10,7 @@ export default defineConfig({
   ],
   base: '/_edit/admin/',
   build: {
-    outDir: '../admin-dist',
+    outDir: '../admin/dist',
     emptyOutDir: true
   },
   server: {

@@ -1,31 +1,28 @@
-# Dependencies
-admin/node_modules/
+# Development Vue source (excluded from distribution)
+admin-source/node_modules/
+admin-source/.vite/
 
-# Build output (tracked - this is what gets deployed)
-# admin-dist/ should be committed for production
+# Prevent dev artifacts in production admin folder
+admin/.vite/
 
-# Development build artifacts
-admin/dist/
+# User data - never commit
+data/database/*.sqlite
+data/database/*.db
+data/database/*.sqlite-journal
+data/database/*.sqlite-wal
+data/database/*.sqlite-shm
 
-# Database - never commit production data
-database/*.sqlite
-database/*.db
-database/*.sqlite-journal
-database/*.sqlite-wal
-database/*.sqlite-shm
+# User uploads - never commit
+uploads/*
+!uploads/.gitkeep
+
+# Config backups - auto-generated
+data/config/backups/
 
 # Environment files
 .env
 .env.local
 .env.*.local
-
-# Config backups - auto-generated
-config/backups/
-
-# Uploads - user content, not tracked
-uploads/*
-!uploads/.gitkeep
-!uploads/**/.gitkeep
 
 # Logs
 *.log

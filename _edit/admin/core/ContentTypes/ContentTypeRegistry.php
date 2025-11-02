@@ -22,7 +22,7 @@ class ContentTypeRegistry
 
     public function __construct(?string $configPath = null)
     {
-        $this->configPath = $configPath ?? EDIT_BASE_PATH . '/config';
+        $this->configPath = $configPath ?? EDIT_BASE_PATH . '/data/config';
     }
 
     /**

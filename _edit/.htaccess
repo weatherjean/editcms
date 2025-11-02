@@ -3,9 +3,8 @@ RewriteEngine On
 RewriteBase /_edit
 
 # Protect sensitive directories
-RewriteRule ^database/ - [F,L]
-RewriteRule ^config/ - [F,L]
-RewriteRule ^core/ - [F,L]
+RewriteRule ^data/ - [F,L]
+RewriteRule ^admin/(core|api)/ - [F,L]
 
 # Protect sensitive files
 <FilesMatch "(\.sqlite|\.txt|\.log|\.env)$">
@@ -13,16 +12,16 @@ RewriteRule ^core/ - [F,L]
     Deny from all
 </FilesMatch>
 
-# API routes - route to api/index.php
+# API routes - route to admin/api/index.php
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+RewriteRule ^api/(.*)$ admin/api/index.php [QSA,L]
 
-# Admin routes - serve admin files
+# Admin routes - serve admin files from admin/dist/
 RewriteCond %{REQUEST_URI} ^/_edit/admin/
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^admin/(.*)$ admin/index.html [L]
+RewriteRule ^admin/(.*)$ admin/dist/index.html [L]
 
 # Allow uploads directory
 RewriteCond %{REQUEST_URI} ^/_edit/uploads/

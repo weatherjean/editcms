@@ -7,14 +7,14 @@ declare(strict_types=1);
  * Sets up autoloading and basic configuration
  */
 
-// Define base path
-define('EDIT_BASE_PATH', dirname(__DIR__));
+// Define base path - points to _edit/ root (parent of admin/)
+define('EDIT_BASE_PATH', dirname(__DIR__, 2));
 
 // Simple PSR-4 autoloader
 spl_autoload_register(function ($class) {
     // Namespace mappings
     $prefixes = [
-        'Edit\\Core\\' => EDIT_BASE_PATH . '/core/',
+        'Edit\\Core\\' => EDIT_BASE_PATH . '/admin/core/',
     ];
 
     // Check each prefix

@@ -23,11 +23,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // Initialize services
-$db = new Database(EDIT_BASE_PATH . '/database/site.sqlite');
+$db = new Database(EDIT_BASE_PATH . '/data/database/site.sqlite');
 $auth = new Auth($db);
 $registry = new ContentTypeRegistry();
 $registry->load();
-$blocks = new Edit\Core\ContentTypes\BlockRegistry(EDIT_BASE_PATH . '/config');
+$blocks = new Edit\Core\ContentTypes\BlockRegistry(EDIT_BASE_PATH . '/data/config');
 $blocks->load();
 
 // Get request method and path
@@ -170,7 +170,7 @@ if ($path === '/health' && $method === 'GET') {
     ];
 
     // Database writable
-    $dbDir = EDIT_BASE_PATH . '/database';
+    $dbDir = EDIT_BASE_PATH . '/data/database';
     $checks['database_writable'] = [
         'value' => is_writable($dbDir),
         'status' => is_writable($dbDir) ? 'ok' : 'warning',
@@ -186,7 +186,7 @@ if ($path === '/health' && $method === 'GET') {
     ];
 
     // Config writable
-    $configDir = EDIT_BASE_PATH . '/config';
+    $configDir = EDIT_BASE_PATH . '/data/config';
     $checks['config_writable'] = [
         'value' => is_writable($configDir),
         'status' => is_writable($configDir) ? 'ok' : 'warning',
@@ -646,7 +646,7 @@ function validateConfigJson(string $json, string $type): ?string {
 
 // List all config files by type
 if ($path === '/config' && $method === 'GET') {
-    $configPath = EDIT_BASE_PATH . '/config';
+    $configPath = EDIT_BASE_PATH . '/data/config';
     $result = [
         'modules' => [],
         'field_groups' => [],
@@ -699,7 +699,7 @@ if ($path === '/config' && $method === 'GET') {
 if (preg_match('#^/config/(modules|field-groups|blocks)/([a-z0-9_-]+)$#', $path, $matches) && $method === 'GET') {
     $type = $matches[1];
     $name = $matches[2];
-    $file = EDIT_BASE_PATH . "/config/{$type}/{$name}.json";
+    $file = EDIT_BASE_PATH . "/data/config/{$type}/{$name}.json";
 
     if (!file_exists($file)) {
         sendError('Config file not found', 404);
@@ -740,7 +740,7 @@ if (preg_match('#^/config/(modules|field-groups|blocks)$#', $path, $matches) && 
     }
 
     // Save file
-    $targetPath = EDIT_BASE_PATH . "/config/{$type}";
+    $targetPath = EDIT_BASE_PATH . "/data/config/{$type}";
     if (!is_dir($targetPath)) {
         mkdir($targetPath, 0755, true);
     }
@@ -765,7 +765,7 @@ if (preg_match('#^/config/(modules|field-groups|blocks)$#', $path, $matches) && 
 if (preg_match('#^/config/(modules|field-groups|blocks)/([a-z0-9_-]+)$#', $path, $matches) && $method === 'DELETE') {
     $type = $matches[1];
     $name = $matches[2];
-    $file = EDIT_BASE_PATH . "/config/{$type}/{$name}.json";
+    $file = EDIT_BASE_PATH . "/data/config/{$type}/{$name}.json";
 
     if (!file_exists($file)) {
         sendError('Config file not found', 404);
@@ -789,7 +789,7 @@ if ($path === '/blocks' && $method === 'GET') {
 
 // Export all configuration as ZIP
 if ($path === '/config/export' && $method === 'GET') {
-    $configPath = EDIT_BASE_PATH . '/config';
+    $configPath = EDIT_BASE_PATH . '/data/config';
     $zipFile = sys_get_temp_dir() . '/edit-config-' . time() . '.zip';
 
     $zip = new ZipArchive();
@@ -850,7 +850,7 @@ if ($path === '/config/import' && $method === 'POST') {
         sendError('Failed to open ZIP archive', 400);
     }
 
-    $configPath = EDIT_BASE_PATH . '/config';
+    $configPath = EDIT_BASE_PATH . '/data/config';
 
     // Create backup before importing
     $backupDir = $configPath . '/backups';

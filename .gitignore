@@ -1,16 +1,18 @@
-# Dependencies
-_edit/admin/node_modules/
-_edit/admin/package-lock.json
+# Build output
+dist/
+*.tar.gz
+*.zip
 
-# Build outputs
-_edit/admin-dist/
-_edit/admin/dist/
+# Development
+_edit/admin-source/node_modules/
+_edit/admin-source/.vite/
 
-# Database
-_edit/database/*.sqlite
-_edit/database/*.db
-
-# Uploads
+# User data
+_edit/data/database/*.sqlite
+_edit/data/database/*.db
+_edit/data/database/*.sqlite-journal
+_edit/data/database/*.sqlite-wal
+_edit/data/database/*.sqlite-shm
 _edit/uploads/*
 !_edit/uploads/.gitkeep
 
@@ -18,24 +20,6 @@ _edit/uploads/*
 *.log
 server.log
 
-# Environment
-.env
-.env.local
-
-# JWT Secret
-_edit/config/jwt-secret.txt
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
 # OS
 .DS_Store
 Thumbs.db
-
-# Temporary files
-*.tmp
-*.temp
