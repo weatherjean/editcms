@@ -111,10 +111,13 @@ class JWT
         }
 
         // Try to get existing secret from settings table
-        $result = $this->db->query("SELECT value FROM settings WHERE key = ?", ['jwt_secret']);
+        $result = $this->db->table('settings')
+            ->select(['value'])
+            ->where('key', 'jwt_secret')
+            ->first();
 
-        if (!empty($result)) {
-            return $result[0]['value'];
+        if ($result) {
+            return $result['value'];
         }
 
         // Check if old file-based secret exists (migration path)
@@ -123,10 +126,10 @@ class JWT
             $secret = trim(file_get_contents($secretFile));
 
             // Migrate to database
-            $this->db->execute(
-                "INSERT INTO settings (key, value) VALUES (?, ?)",
-                ['jwt_secret', $secret]
-            );
+            $this->db->table('settings')->insert([
+                'key' => 'jwt_secret',
+                'value' => $secret
+            ]);
 
             // Optionally delete the file after migration
             // Commented out to be safe - can be manually deleted
@@ -139,10 +142,10 @@ class JWT
         $secret = bin2hex(random_bytes(32));
 
         // Save it to database
-        $this->db->execute(
-            "INSERT INTO settings (key, value) VALUES (?, ?)",
-            ['jwt_secret', $secret]
-        );
+        $this->db->table('settings')->insert([
+            'key' => 'jwt_secret',
+            'value' => $secret
+        ]);
 
         return $secret;
     }

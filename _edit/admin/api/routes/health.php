@@ -15,8 +15,8 @@ function handleHealthRoutes(string $method, string $path, Database $db): bool
 {
     // Check if any users exist (for first-time setup detection)
     if ($path === '/auth/has-users' && $method === 'GET') {
-        $users = $db->query("SELECT COUNT(*) as count FROM users");
-        sendJson(['has_users' => $users[0]['count'] > 0]);
+        $count = $db->table('users')->count();
+        sendJson(['has_users' => $count > 0]);
         return true;
     }
 

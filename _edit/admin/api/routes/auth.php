@@ -48,8 +48,8 @@ function handleAuthRoutes(string $method, string $path, Auth $auth, Database $db
         checkRateLimit($db, 'register', 3, 15);
 
         // Only allow registration if no users exist (first-time setup)
-        $users = $db->query("SELECT COUNT(*) as count FROM users");
-        if ($users[0]['count'] > 0) {
+        $users = $db->table('users')->count();
+        if ($users > 0) {
             sendError('Registration is disabled. Please contact an administrator.', 403);
         }
 

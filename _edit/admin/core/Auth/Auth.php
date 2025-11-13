@@ -29,8 +29,8 @@ class Auth
         }
 
         // Check if email already exists
-        $existing = $this->db->query("SELECT id FROM users WHERE email = ?", [$email]);
-        if (!empty($existing)) {
+        $count = $this->db->table('users')->where('email', $email)->count();
+        if ($count > 0) {
             throw new \RuntimeException("Email already registered");
         }
 
@@ -38,12 +38,11 @@ class Auth
         $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
         // Insert user
-        $this->db->execute(
-            "INSERT INTO users (email, password, name) VALUES (?, ?, ?)",
-            [$email, $hashedPassword, $name]
-        );
-
-        return $this->db->lastInsertId();
+        return $this->db->table('users')->insert([
+            'email' => $email,
+            'password' => $hashedPassword,
+            'name' => $name
+        ]);
     }
 
     /**
@@ -52,13 +51,11 @@ class Auth
     public function login(string $email, string $password): ?array
     {
         // Find user by email
-        $users = $this->db->query("SELECT * FROM users WHERE email = ?", [$email]);
+        $user = $this->db->table('users')->where('email', $email)->first();
 
-        if (empty($users)) {
+        if (!$user) {
             return null;
         }
-
-        $user = $users[0];
 
         // Verify password
         if (!password_verify($password, $user['password'])) {
@@ -111,9 +108,10 @@ class Auth
             return null;
         }
 
-        $users = $this->db->query("SELECT id, email, name, created_at FROM users WHERE id = ?", [$this->currentUserId]);
-
-        return $users[0] ?? null;
+        return $this->db->table('users')
+            ->select(['id', 'email', 'name', 'created_at'])
+            ->where('id', $this->currentUserId)
+            ->first();
     }
 
     /**

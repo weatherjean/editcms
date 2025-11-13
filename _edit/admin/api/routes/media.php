@@ -56,13 +56,14 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
 
         // Save to database
         $relativePath = date('Y/m') . '/' . $filename;
-        $db->execute(
-            "INSERT INTO media (filename, path, mime_type, size) VALUES (?, ?, ?, ?)",
-            [$file['name'], $relativePath, $file['type'], $file['size']]
-        );
+        $mediaId = $db->table('media')->insert([
+            'filename' => $file['name'],
+            'path' => $relativePath,
+            'mime_type' => $file['type'],
+            'size' => $file['size']
+        ]);
 
-        $mediaId = $db->lastInsertId();
-        $media = $db->query("SELECT * FROM media WHERE id = ?", [$mediaId])[0];
+        $media = $db->table('media')->where('id', $mediaId)->first();
         $media['url'] = '/_edit/uploads/' . $media['path'];
 
         sendJson($media);
@@ -76,15 +77,15 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
         if ($method === 'GET') {
             if ($mediaId) {
                 // Get single media
-                $media = $db->query("SELECT * FROM media WHERE id = ?", [$mediaId]);
-                if (empty($media)) {
+                $media = $db->table('media')->where('id', $mediaId)->first();
+                if (!$media) {
                     sendError('Media not found', 404);
                 }
-                $media[0]['url'] = '/_edit/uploads/' . $media[0]['path'];
-                sendJson($media[0]);
+                $media['url'] = '/_edit/uploads/' . $media['path'];
+                sendJson($media);
             } else {
                 // List all media
-                $media = $db->query("SELECT * FROM media ORDER BY created_at DESC");
+                $media = $db->table('media')->orderBy('created_at', 'DESC')->get();
                 foreach ($media as &$item) {
                     $item['url'] = '/_edit/uploads/' . $item['path'];
                 }
@@ -95,13 +96,13 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
 
         if ($method === 'DELETE' && $mediaId) {
             // Delete media file and database record
-            $media = $db->query("SELECT * FROM media WHERE id = ?", [$mediaId]);
-            if (!empty($media)) {
-                $filePath = EDIT_BASE_PATH . '/uploads/' . $media[0]['path'];
+            $media = $db->table('media')->where('id', $mediaId)->first();
+            if ($media) {
+                $filePath = EDIT_BASE_PATH . '/uploads/' . $media['path'];
                 if (file_exists($filePath)) {
                     unlink($filePath);
                 }
-                $db->execute("DELETE FROM media WHERE id = ?", [$mediaId]);
+                $db->table('media')->where('id', $mediaId)->delete();
             }
             sendJson(['success' => true]);
             return true;

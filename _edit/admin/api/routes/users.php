@@ -18,7 +18,10 @@ function handleUserRoutes(string $method, string $path, Database $db, Auth $auth
 {
     // Get all users
     if ($path === '/users' && $method === 'GET') {
-        $users = $db->query("SELECT id, name, email, created_at FROM users ORDER BY created_at DESC");
+        $users = $db->table('users')
+            ->select(['id', 'name', 'email', 'created_at'])
+            ->orderBy('created_at', 'DESC')
+            ->get();
         sendJson($users);
         return true;
     }
@@ -32,7 +35,10 @@ function handleUserRoutes(string $method, string $path, Database $db, Auth $auth
 
         try {
             $newUserId = $auth->register($data['email'], $data['password'], $data['name']);
-            $newUser = $db->query("SELECT id, name, email, created_at FROM users WHERE id = ?", [$newUserId]);
+            $newUser = $db->table('users')
+                ->select(['id', 'name', 'email', 'created_at'])
+                ->where('id', $newUserId)
+                ->first();
             sendJson($newUser[0]);
         } catch (\Exception $e) {
             sendError($e->getMessage(), 400);
@@ -50,7 +56,9 @@ function handleUserRoutes(string $method, string $path, Database $db, Auth $auth
         }
 
         $passwordHash = password_hash($data['password'], PASSWORD_DEFAULT);
-        $db->execute("UPDATE users SET password = ? WHERE id = ?", [$passwordHash, $targetUserId]);
+        $db->table('users')
+            ->where('id', $targetUserId)
+            ->update(['password' => $passwordHash]);
 
         sendJson(['success' => true, 'message' => 'Password updated successfully']);
         return true;
@@ -66,12 +74,12 @@ function handleUserRoutes(string $method, string $path, Database $db, Auth $auth
         }
 
         // Prevent deleting the last user
-        $userCount = $db->query("SELECT COUNT(*) as count FROM users");
-        if ($userCount[0]['count'] <= 1) {
+        $userCount = $db->table('users')->count();
+        if ($userCount <= 1) {
             sendError('Cannot delete the last user', 400);
         }
 
-        $db->execute("DELETE FROM users WHERE id = ?", [$targetUserId]);
+        $db->table('users')->where('id', $targetUserId)->delete();
         sendJson(['success' => true, 'message' => 'User deleted successfully']);
         return true;
     }

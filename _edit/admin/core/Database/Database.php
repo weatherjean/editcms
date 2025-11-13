@@ -357,4 +357,19 @@ class Database
             // Log if you have logging system
         }
     }
+
+    /**
+     * Create a new query builder instance for the given table
+     *
+     * Example usage:
+     *   $users = $db->table('users')
+     *       ->where('status', 'active')
+     *       ->orderBy('created_at', 'DESC')
+     *       ->limit(10)
+     *       ->get();
+     */
+    public function table(string $table): QueryBuilder
+    {
+        return (new QueryBuilder($this))->table($table);
+    }
 }

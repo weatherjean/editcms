@@ -27,10 +27,10 @@ function handlePublicEmailRoutes(string $method, string $path, Database $db): bo
         $expiresAt = date('Y-m-d H:i:s', time() + 30); // 30 seconds from now
 
         // Store token
-        $db->execute(
-            "INSERT INTO email_tokens (token, expires_at) VALUES (?, ?)",
-            [$token, $expiresAt]
-        );
+        $db->table('email_tokens')->insert([
+            'token' => $token,
+            'expires_at' => $expiresAt
+        ]);
 
         sendJson([
             'token' => $token,
@@ -61,50 +61,70 @@ function handlePublicEmailRoutes(string $method, string $path, Database $db): bo
         }
 
         // Check token exists and is not expired
-        $tokenCheck = $db->query(
-            "SELECT expires_at FROM email_tokens WHERE token = ?",
-            [$data['token']]
-        );
+        $tokenCheck = $db->table('email_tokens')
+            ->select(['expires_at'])
+            ->where('token', $data['token'])
+            ->first();
 
         if (empty($tokenCheck)) {
             sendError('Invalid or already used email token', 403);
         }
 
-        if (strtotime($tokenCheck[0]['expires_at']) < time()) {
+        if (strtotime($tokenCheck['expires_at']) < time()) {
             sendError('Email token expired', 403);
         }
 
         // Delete token (single-use - delete immediately)
-        $db->execute(
-            "DELETE FROM email_tokens WHERE token = ?",
-            [$data['token']]
-        );
+        $db->table('email_tokens')
+            ->where('token', $data['token'])
+            ->delete();
 
         // Load email configuration from database
-        $fromEmail = $db->query("SELECT value FROM settings WHERE key = 'email_from_address'");
-        $fromName = $db->query("SELECT value FROM settings WHERE key = 'email_from_name'");
+        $fromEmail = $db->table('settings')
+            ->select(['value'])
+            ->where('key', 'email_from_address')
+            ->first();
+        $fromName = $db->table('settings')
+            ->select(['value'])
+            ->where('key', 'email_from_name')
+            ->first();
 
         // Load SMTP configuration
-        $smtpHost = $db->query("SELECT value FROM settings WHERE key = 'smtp_host'");
-        $smtpPort = $db->query("SELECT value FROM settings WHERE key = 'smtp_port'");
-        $smtpUsername = $db->query("SELECT value FROM settings WHERE key = 'smtp_username'");
-        $smtpPassword = $db->query("SELECT value FROM settings WHERE key = 'smtp_password'");
-        $smtpEncryption = $db->query("SELECT value FROM settings WHERE key = 'smtp_encryption'");
+        $smtpHost = $db->table('settings')
+            ->select(['value'])
+            ->where('key', 'smtp_host')
+            ->first();
+        $smtpPort = $db->table('settings')
+            ->select(['value'])
+            ->where('key', 'smtp_port')
+            ->first();
+        $smtpUsername = $db->table('settings')
+            ->select(['value'])
+            ->where('key', 'smtp_username')
+            ->first();
+        $smtpPassword = $db->table('settings')
+            ->select(['value'])
+            ->where('key', 'smtp_password')
+            ->first();
+        $smtpEncryption = $db->table('settings')
+            ->select(['value'])
+            ->where('key', 'smtp_encryption')
+            ->first();
 
         $smtpConfig = null;
-        if (!empty($smtpHost[0]['value'] ?? '')) {
+        if (!empty($smtpHost['value'] ?? '')) {
             $smtpConfig = [
-                'host' => $smtpHost[0]['value'] ?? '',
-                'port' => $smtpPort[0]['value'] ?? 587,
-                'username' => $smtpUsername[0]['value'] ?? '',
-                'password' => $smtpPassword[0]['value'] ?? '',
-                'encryption' => $smtpEncryption[0]['value'] ?? 'tls'
+                'host' => $smtpHost['value'] ?? '',
+                'port' => $smtpPort['value'] ?? 587,
+                'username' => $smtpUsername['value'] ?? '',
+                'password' => $smtpPassword['value'] ?? '',
+                'encryption' => $smtpEncryption['value'] ?? 'tls'
             ];
         }
 
         $emailConfig = [
-            'from_email' => $fromEmail[0]['value'] ?? '',
-            'from_name' => $fromName[0]['value'] ?? ''
+            'from_email' => $fromEmail['value'] ?? '',
+            'from_name' => $fromName['value'] ?? ''
         ];
 
         // Create email instance with SMTP config
@@ -124,17 +144,22 @@ function handlePublicEmailRoutes(string $method, string $path, Database $db): bo
 
         // Log the email send attempt
         if ($success) {
-            $db->execute(
-                "INSERT INTO email_logs (to_address, subject, success, ip_address) VALUES (?, ?, 1, ?)",
-                [$data['to'], $data['subject'], $ipAddress]
-            );
+            $db->table('email_logs')->insert([
+                'to_address' => $data['to'],
+                'subject' => $data['subject'],
+                'success' => 1,
+                'ip_address' => $ipAddress
+            ]);
             sendJson(['success' => true, 'message' => 'Email sent successfully']);
         } else {
             $errorMessage = $email->getLastError() ?: 'Unknown error';
-            $db->execute(
-                "INSERT INTO email_logs (to_address, subject, success, error_message, ip_address) VALUES (?, ?, 0, ?, ?)",
-                [$data['to'], $data['subject'], $errorMessage, $ipAddress]
-            );
+            $db->table('email_logs')->insert([
+                'to_address' => $data['to'],
+                'subject' => $data['subject'],
+                'success' => 0,
+                'error_message' => $errorMessage,
+                'ip_address' => $ipAddress
+            ]);
             sendError('Failed to send email: ' . $errorMessage, 500);
         }
         return true;
@@ -156,24 +181,45 @@ function handleEmailAdminRoutes(string $method, string $path, Database $db): boo
     // Get email settings
     if ($path === '/email-settings' && $method === 'GET') {
         // Get settings from database
-        $fromEmail = $db->query("SELECT value FROM settings WHERE key = 'email_from_address'");
-        $fromName = $db->query("SELECT value FROM settings WHERE key = 'email_from_name'");
+        $fromEmail = $db->table('settings')
+            ->select(['value'])
+            ->where('key', 'email_from_address')
+            ->first();
+        $fromName = $db->table('settings')
+            ->select(['value'])
+            ->where('key', 'email_from_name')
+            ->first();
 
         // Get SMTP settings
-        $smtpHost = $db->query("SELECT value FROM settings WHERE key = 'smtp_host'");
-        $smtpPort = $db->query("SELECT value FROM settings WHERE key = 'smtp_port'");
-        $smtpUsername = $db->query("SELECT value FROM settings WHERE key = 'smtp_username'");
-        $smtpPassword = $db->query("SELECT value FROM settings WHERE key = 'smtp_password'");
-        $smtpEncryption = $db->query("SELECT value FROM settings WHERE key = 'smtp_encryption'");
+        $smtpHost = $db->table('settings')
+            ->select(['value'])
+            ->where('key', 'smtp_host')
+            ->first();
+        $smtpPort = $db->table('settings')
+            ->select(['value'])
+            ->where('key', 'smtp_port')
+            ->first();
+        $smtpUsername = $db->table('settings')
+            ->select(['value'])
+            ->where('key', 'smtp_username')
+            ->first();
+        $smtpPassword = $db->table('settings')
+            ->select(['value'])
+            ->where('key', 'smtp_password')
+            ->first();
+        $smtpEncryption = $db->table('settings')
+            ->select(['value'])
+            ->where('key', 'smtp_encryption')
+            ->first();
 
         sendJson([
-            'from_email' => $fromEmail[0]['value'] ?? '',
-            'from_name' => $fromName[0]['value'] ?? '',
-            'smtp_host' => $smtpHost[0]['value'] ?? '',
-            'smtp_port' => $smtpPort[0]['value'] ?? '587',
-            'smtp_username' => $smtpUsername[0]['value'] ?? '',
-            'smtp_password' => $smtpPassword[0]['value'] ?? '',
-            'smtp_encryption' => $smtpEncryption[0]['value'] ?? 'tls'
+            'from_email' => $fromEmail['value'] ?? '',
+            'from_name' => $fromName['value'] ?? '',
+            'smtp_host' => $smtpHost['value'] ?? '',
+            'smtp_port' => $smtpPort['value'] ?? '587',
+            'smtp_username' => $smtpUsername['value'] ?? '',
+            'smtp_password' => $smtpPassword['value'] ?? '',
+            'smtp_encryption' => $smtpEncryption['value'] ?? 'tls'
         ]);
         return true;
     }
@@ -202,11 +248,24 @@ function handleEmailAdminRoutes(string $method, string $path, Database $db): boo
 
         // Helper function to save setting
         $saveSetting = function($key, $value) use ($db) {
-            $db->execute("
-                INSERT INTO settings (key, value, updated_at)
-                VALUES (?, ?, datetime('now'))
-                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
-            ", [$key, $value]);
+            $existing = $db->table('settings')
+                ->where('key', $key)
+                ->first();
+
+            if ($existing) {
+                $db->table('settings')
+                    ->where('key', $key)
+                    ->update([
+                        'value' => $value,
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ]);
+            } else {
+                $db->table('settings')->insert([
+                    'key' => $key,
+                    'value' => $value,
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+            }
         };
 
         // Save basic email settings
@@ -232,14 +291,14 @@ function handleEmailAdminRoutes(string $method, string $path, Database $db): boo
         $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 50;
         $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
 
-        $logs = $db->query(
-            "SELECT * FROM email_logs ORDER BY created_at DESC LIMIT ? OFFSET ?",
-            [$limit, $offset]
-        );
+        $logs = $db->table('email_logs')
+            ->orderBy('created_at', 'DESC')
+            ->limit($limit)
+            ->offset($offset)
+            ->get();
 
         // Get total count
-        $totalResult = $db->query("SELECT COUNT(*) as total FROM email_logs");
-        $total = $totalResult[0]['total'] ?? 0;
+        $total = $db->table('email_logs')->count();
 
         sendJson([
             'logs' => $logs,

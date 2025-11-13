@@ -60,12 +60,12 @@ class ContentType
             }
 
             // Insert into content table
-            $this->db->execute(
-                "INSERT INTO content (type, slug, status, author_id) VALUES (?, ?, ?, ?)",
-                [$this->type, $slug, $status, $authorId]
-            );
-
-            $contentId = $this->db->lastInsertId();
+            $contentId = $this->db->table('content')->insert([
+                'type' => $this->type,
+                'slug' => $slug,
+                'status' => $status,
+                'author_id' => $authorId
+            ]);
 
             // Save meta fields
             if (isset($data['fields'])) {
@@ -88,9 +88,8 @@ class ContentType
         $this->db->beginTransaction();
 
         try {
-            // Build update query for core fields
-            $updates = [];
-            $params = [];
+            // Build update data for core fields
+            $updateData = [];
 
             if (isset($data['slug'])) {
                 // Slug is required and cannot be empty
@@ -99,40 +98,43 @@ class ContentType
                 }
 
                 // Check slug uniqueness (excluding current item)
-                $existing = $this->db->query(
-                    "SELECT id FROM content WHERE type = ? AND slug = ? AND id != ?",
-                    [$this->type, $data['slug'], $id]
-                );
-                if (!empty($existing)) {
+                $count = $this->db->table('content')
+                    ->where('type', $this->type)
+                    ->where('slug', $data['slug'])
+                    ->where('id', '!=', $id)
+                    ->count();
+
+                if ($count > 0) {
                     throw new \RuntimeException("Slug already exists for this content type");
                 }
-                $updates[] = 'slug = ?';
-                $params[] = $data['slug'];
+                $updateData['slug'] = $data['slug'];
             }
 
             if (isset($data['status'])) {
-                $updates[] = 'status = ?';
-                $params[] = $data['status'];
+                $updateData['status'] = $data['status'];
             }
 
             if (isset($data['author_id'])) {
-                $updates[] = 'author_id = ?';
-                $params[] = $data['author_id'];
+                $updateData['author_id'] = $data['author_id'];
             }
 
-            $updates[] = 'updated_at = CURRENT_TIMESTAMP';
-            $params[] = $id;
+            // Always update timestamp
+            // Note: QueryBuilder doesn't support CURRENT_TIMESTAMP directly, so we use PHP
+            $updateData['updated_at'] = date('Y-m-d H:i:s');
 
             // Update content table
-            if (!empty($updates)) {
-                $sql = "UPDATE content SET " . implode(', ', $updates) . " WHERE id = ?";
-                $this->db->execute($sql, $params);
+            if (!empty($updateData)) {
+                $this->db->table('content')
+                    ->where('id', $id)
+                    ->update($updateData);
             }
 
             // Update meta fields
             if (isset($data['fields'])) {
                 // Delete existing meta
-                $this->db->execute("DELETE FROM content_meta WHERE content_id = ?", [$id]);
+                $this->db->table('content_meta')
+                    ->where('content_id', $id)
+                    ->delete();
                 // Insert new meta
                 $this->saveMeta($id, $data['fields']);
             }
@@ -152,7 +154,10 @@ class ContentType
     {
         try {
             // Foreign key cascade will delete meta automatically
-            $this->db->execute("DELETE FROM content WHERE id = ? AND type = ?", [$id, $this->type]);
+            $this->db->table('content')
+                ->where('id', $id)
+                ->where('type', $this->type)
+                ->delete();
             return true;
         } catch (\Exception $e) {
             throw new \RuntimeException("Failed to delete content: {$e->getMessage()}");
@@ -164,16 +169,14 @@ class ContentType
      */
     public function find(int $id): ?array
     {
-        $content = $this->db->query(
-            "SELECT * FROM content WHERE id = ? AND type = ?",
-            [$id, $this->type]
-        );
+        $result = $this->db->table('content')
+            ->where('id', $id)
+            ->where('type', $this->type)
+            ->first();
 
-        if (empty($content)) {
+        if (!$result) {
             return null;
         }
-
-        $result = $content[0];
 
         // Get meta fields
         $result['fields'] = $this->getMeta($id);
@@ -189,37 +192,62 @@ class ContentType
      */
     public function all(array $filters = []): array
     {
-        $sql = "SELECT * FROM content WHERE type = ?";
-        $params = [$this->type];
+        // Start building query
+        $query = $this->db->table('content')->where('type', $this->type);
 
-        // Apply filters
+        // Apply basic filters
         if (isset($filters['status'])) {
-            $sql .= " AND status = ?";
-            $params[] = $filters['status'];
+            $query->where('status', $filters['status']);
+        }
+
+        if (isset($filters['slug'])) {
+            $query->where('slug', $filters['slug']);
         }
 
         if (isset($filters['author_id'])) {
-            $sql .= " AND author_id = ?";
-            $params[] = $filters['author_id'];
+            $query->where('author_id', $filters['author_id']);
         }
 
-        // Ordering
-        $orderBy = $filters['order_by'] ?? 'created_at';
-        $orderDir = $filters['order_dir'] ?? 'DESC';
-        $sql .= " ORDER BY {$orderBy} {$orderDir}";
+        // Apply field filters using EXISTS subqueries
+        if (isset($filters['field_filters']) && !empty($filters['field_filters'])) {
+            foreach ($filters['field_filters'] as $index => $filter) {
+                $alias = "m{$index}";
 
-        // Pagination
-        if (isset($filters['limit'])) {
-            $sql .= " LIMIT ?";
-            $params[] = (int) $filters['limit'];
+                // Build subquery for EXISTS clause
+                if ($filter['operator'] === 'LIKE') {
+                    $subquery = "SELECT 1 FROM content_meta {$alias} " .
+                               "WHERE {$alias}.content_id = content.id " .
+                               "AND {$alias}.meta_key = ? " .
+                               "AND {$alias}.meta_value LIKE ?";
+                    $bindings = [$filter['key'], '%' . $filter['value'] . '%'];
+                } else {
+                    $subquery = "SELECT 1 FROM content_meta {$alias} " .
+                               "WHERE {$alias}.content_id = content.id " .
+                               "AND {$alias}.meta_key = ? " .
+                               "AND {$alias}.meta_value {$filter['operator']} ?";
+                    $bindings = [$filter['key'], $filter['value']];
+                }
 
-            if (isset($filters['offset'])) {
-                $sql .= " OFFSET ?";
-                $params[] = (int) $filters['offset'];
+                $query->whereExists($subquery, $bindings);
             }
         }
 
-        $results = $this->db->query($sql, $params);
+        // Apply ordering
+        $orderBy = $filters['order_by'] ?? 'created_at';
+        $orderDir = $filters['order_dir'] ?? 'DESC';
+        $query->orderBy($orderBy, $orderDir);
+
+        // Apply pagination
+        if (isset($filters['limit'])) {
+            $query->limit((int) $filters['limit']);
+
+            if (isset($filters['offset'])) {
+                $query->offset((int) $filters['offset']);
+            }
+        }
+
+        // Execute query
+        $results = $query->get();
 
         // Populate meta and relationships for each item
         foreach ($results as &$item) {
@@ -228,6 +256,62 @@ class ContentType
         }
 
         return $results;
+    }
+
+    /**
+     * Count content items matching filters
+     */
+    public function count(array $filters = []): int
+    {
+        // Start building query
+        $query = $this->db->table('content')->where('type', $this->type);
+
+        // Apply basic filters
+        if (isset($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (isset($filters['slug'])) {
+            $query->where('slug', $filters['slug']);
+        }
+
+        if (isset($filters['author_id'])) {
+            $query->where('author_id', $filters['author_id']);
+        }
+
+        // Apply field filters using EXISTS subqueries
+        if (isset($filters['field_filters']) && !empty($filters['field_filters'])) {
+            foreach ($filters['field_filters'] as $index => $filter) {
+                $alias = "m{$index}";
+
+                // Build subquery for EXISTS clause
+                if ($filter['operator'] === 'LIKE') {
+                    $subquery = "SELECT 1 FROM content_meta {$alias} " .
+                               "WHERE {$alias}.content_id = content.id " .
+                               "AND {$alias}.meta_key = ? " .
+                               "AND {$alias}.meta_value LIKE ?";
+                    $bindings = [$filter['key'], '%' . $filter['value'] . '%'];
+                } else {
+                    $subquery = "SELECT 1 FROM content_meta {$alias} " .
+                               "WHERE {$alias}.content_id = content.id " .
+                               "AND {$alias}.meta_key = ? " .
+                               "AND {$alias}.meta_value {$filter['operator']} ?";
+                    $bindings = [$filter['key'], $filter['value']];
+                }
+
+                $query->whereExists($subquery, $bindings);
+            }
+        }
+
+        return $query->count();
+    }
+
+    /**
+     * Get the database instance (for public API)
+     */
+    public function getDatabase(): Database
+    {
+        return $this->db;
     }
 
     /**
@@ -261,10 +345,11 @@ class ContentType
             }
 
             // Insert meta
-            $this->db->execute(
-                "INSERT INTO content_meta (content_id, meta_key, meta_value) VALUES (?, ?, ?)",
-                [$contentId, $key, $dbValue]
-            );
+            $this->db->table('content_meta')->insert([
+                'content_id' => $contentId,
+                'meta_key' => $key,
+                'meta_value' => $dbValue
+            ]);
         }
     }
 
@@ -273,10 +358,10 @@ class ContentType
      */
     private function getMeta(int $contentId): array
     {
-        $meta = $this->db->query(
-            "SELECT meta_key, meta_value FROM content_meta WHERE content_id = ?",
-            [$contentId]
-        );
+        $meta = $this->db->table('content_meta')
+            ->select(['meta_key', 'meta_value'])
+            ->where('content_id', $contentId)
+            ->get();
 
         $fields = [];
 
@@ -329,13 +414,19 @@ class ContentType
 
                         if ($relatedId) {
                             if ($target === 'user') {
-                                $related = $this->db->query("SELECT id, name, email FROM users WHERE id = ?", [$relatedId]);
+                                $related = $this->db->table('users')
+                                    ->select(['id', 'name', 'email'])
+                                    ->where('id', $relatedId)
+                                    ->first();
                             } else {
-                                $related = $this->db->query("SELECT id, type, slug FROM content WHERE id = ?", [$relatedId]);
+                                $related = $this->db->table('content')
+                                    ->select(['id', 'type', 'slug'])
+                                    ->where('id', $relatedId)
+                                    ->first();
                             }
 
-                            if (!empty($related)) {
-                                $content['fields'][$fieldKey] = $related[0];
+                            if ($related) {
+                                $content['fields'][$fieldKey] = $related;
                             }
                         }
                     } catch (\Exception $e) {
@@ -380,11 +471,10 @@ class ContentType
             return null;
         }
 
-        $media = $this->db->query("SELECT * FROM media WHERE id = ?", [$mediaId]);
-        if (!empty($media)) {
-            $mediaData = $media[0];
-            $mediaData['url'] = '/_edit/uploads/' . $mediaData['path'];
-            return $mediaData;
+        $media = $this->db->table('media')->where('id', $mediaId)->first();
+        if ($media) {
+            $media['url'] = '/_edit/uploads/' . $media['path'];
+            return $media;
         }
 
         return $mediaId;
@@ -395,11 +485,9 @@ class ContentType
      */
     private function slugExists(string $slug): bool
     {
-        $result = $this->db->query(
-            "SELECT COUNT(*) as count FROM content WHERE type = ? AND slug = ?",
-            [$this->type, $slug]
-        );
-
-        return $result[0]['count'] > 0;
+        return $this->db->table('content')
+            ->where('type', $this->type)
+            ->where('slug', $slug)
+            ->count() > 0;
     }
 }
