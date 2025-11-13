@@ -73,8 +73,9 @@ class QueryBuilder
 
     /**
      * Add a WHERE clause
+     * Supports both: where('col', '=', 'val') and where('col', 'val')
      */
-    public function where(string $column, string $operator, mixed $value = null): self
+    public function where(string $column, mixed $operator, mixed $value = null): self
     {
         // If only 2 args, assume operator is '='
         if ($value === null && func_num_args() === 2) {
@@ -98,8 +99,9 @@ class QueryBuilder
 
     /**
      * Add an OR WHERE clause
+     * Supports both: orWhere('col', '=', 'val') and orWhere('col', 'val')
      */
-    public function orWhere(string $column, string $operator, mixed $value = null): self
+    public function orWhere(string $column, mixed $operator, mixed $value = null): self
     {
         if ($value === null && func_num_args() === 2) {
             $value = $operator;

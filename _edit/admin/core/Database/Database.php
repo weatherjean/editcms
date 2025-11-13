@@ -291,12 +291,14 @@ class Database
 
     /**
      * Execute an INSERT/UPDATE/DELETE query
+     * Returns the number of affected rows
      */
-    public function execute(string $sql, array $params = []): bool
+    public function execute(string $sql, array $params = []): int
     {
         try {
             $stmt = $this->pdo->prepare($sql);
-            return $stmt->execute($params);
+            $stmt->execute($params);
+            return $stmt->rowCount();
         } catch (PDOException $e) {
             throw new \RuntimeException("Execute failed: {$e->getMessage()}");
         }
