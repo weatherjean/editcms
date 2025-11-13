@@ -114,3 +114,107 @@ function checkRateLimit(Database $db, string $endpoint, int $maxAttempts = 10, i
         }
     }
 }
+
+/**
+ * Get multiple settings in a single query
+ *
+ * @param Database $db Database instance
+ * @param array $keys Setting keys to fetch
+ * @return array Associative array of key => value
+ */
+function getSettings(Database $db, array $keys): array
+{
+    $placeholders = str_repeat('?,', count($keys) - 1) . '?';
+    $results = $db->query(
+        "SELECT key, value FROM settings WHERE key IN ($placeholders)",
+        $keys
+    );
+
+    $settings = [];
+    foreach ($results as $row) {
+        $settings[$row['key']] = $row['value'];
+    }
+
+    return $settings;
+}
+
+/**
+ * Validate required fields exist in data
+ *
+ * @param array $data Data to validate
+ * @param array $required Required field names
+ * @param int $statusCode HTTP status code for error (default: 400)
+ * @return void Sends error and exits if validation fails
+ */
+function requireFields(array $data, array $required, int $statusCode = 400): void
+{
+    $missing = [];
+    foreach ($required as $field) {
+        if (!isset($data[$field]) || $data[$field] === '' || $data[$field] === null) {
+            $missing[] = $field;
+        }
+    }
+
+    if (!empty($missing)) {
+        $fields = implode(', ', $missing);
+        sendError(ucfirst($fields) . ' required', $statusCode);
+    }
+}
+
+/**
+ * Save or update a setting (upsert)
+ *
+ * @param Database $db Database instance
+ * @param string $key Setting key
+ * @param string $value Setting value
+ * @return void
+ */
+function saveSetting(Database $db, string $key, string $value): void
+{
+    $existing = $db->table('settings')
+        ->where('key', $key)
+        ->first();
+
+    if ($existing) {
+        $db->table('settings')
+            ->where('key', $key)
+            ->update([
+                'value' => $value,
+                'updated_at' => date('Y-m-d H:i:s')
+            ]);
+    } else {
+        $db->table('settings')->insert([
+            'key' => $key,
+            'value' => $value,
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+    }
+}
+
+/**
+ * Add URL to media item(s)
+ *
+ * @param array|null $media Single media item or array of items
+ * @return array|null Media with URL added
+ */
+function addMediaUrl(array|null $media): array|null
+{
+    if (!$media) {
+        return null;
+    }
+
+    // Check if it's a single item (has 'path' key) or array of items
+    if (isset($media['path'])) {
+        // Single item
+        $media['url'] = '/_edit/uploads/' . $media['path'];
+        return $media;
+    } else {
+        // Array of items
+        foreach ($media as &$item) {
+            if (isset($item['path'])) {
+                $item['url'] = '/_edit/uploads/' . $item['path'];
+            }
+        }
+        return $media;
+    }
+}

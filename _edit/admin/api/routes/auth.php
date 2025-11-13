@@ -25,9 +25,7 @@ function handleAuthRoutes(string $method, string $path, Auth $auth, Database $db
         checkRateLimit($db, 'login', 5, 15);
 
         $data = getJsonBody();
-        if (!isset($data['email']) || !isset($data['password'])) {
-            sendError('Email and password required', 400);
-        }
+        requireFields($data, ['email', 'password']);
 
         $result = $auth->login($data['email'], $data['password']);
         if (!$result) {
@@ -54,9 +52,7 @@ function handleAuthRoutes(string $method, string $path, Auth $auth, Database $db
         }
 
         $data = getJsonBody();
-        if (!isset($data['email']) || !isset($data['password']) || !isset($data['name'])) {
-            sendError('Email, password, and name required', 400);
-        }
+        requireFields($data, ['email', 'password', 'name']);
 
         try {
             $userId = $auth->register($data['email'], $data['password'], $data['name']);

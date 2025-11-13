@@ -64,7 +64,7 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
         ]);
 
         $media = $db->table('media')->where('id', $mediaId)->first();
-        $media['url'] = '/_edit/uploads/' . $media['path'];
+        $media = addMediaUrl($media);
 
         sendJson($media);
         return true;
@@ -81,14 +81,12 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
                 if (!$media) {
                     sendError('Media not found', 404);
                 }
-                $media['url'] = '/_edit/uploads/' . $media['path'];
+                $media = addMediaUrl($media);
                 sendJson($media);
             } else {
                 // List all media
                 $media = $db->table('media')->orderBy('created_at', 'DESC')->get();
-                foreach ($media as &$item) {
-                    $item['url'] = '/_edit/uploads/' . $item['path'];
-                }
+                $media = addMediaUrl($media);
                 sendJson($media);
             }
             return true;

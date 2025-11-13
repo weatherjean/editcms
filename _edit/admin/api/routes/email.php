@@ -51,14 +51,10 @@ function handlePublicEmailRoutes(string $method, string $path, Database $db): bo
         $data = getJsonBody();
 
         // Validate required fields
-        if (!isset($data['to']) || !isset($data['subject']) || !isset($data['message'])) {
-            sendError('Missing required fields: to, subject, message', 400);
-        }
+        requireFields($data, ['to', 'subject', 'message']);
 
         // Validate token
-        if (!isset($data['token']) || empty($data['token'])) {
-            sendError('Missing email token. Call GET /send-email/token first.', 400);
-        }
+        requireFields($data, ['token']);
 
         // Check token exists and is not expired
         $tokenCheck = $db->table('email_tokens')
@@ -79,52 +75,31 @@ function handlePublicEmailRoutes(string $method, string $path, Database $db): bo
             ->where('token', $data['token'])
             ->delete();
 
-        // Load email configuration from database
-        $fromEmail = $db->table('settings')
-            ->select(['value'])
-            ->where('key', 'email_from_address')
-            ->first();
-        $fromName = $db->table('settings')
-            ->select(['value'])
-            ->where('key', 'email_from_name')
-            ->first();
-
-        // Load SMTP configuration
-        $smtpHost = $db->table('settings')
-            ->select(['value'])
-            ->where('key', 'smtp_host')
-            ->first();
-        $smtpPort = $db->table('settings')
-            ->select(['value'])
-            ->where('key', 'smtp_port')
-            ->first();
-        $smtpUsername = $db->table('settings')
-            ->select(['value'])
-            ->where('key', 'smtp_username')
-            ->first();
-        $smtpPassword = $db->table('settings')
-            ->select(['value'])
-            ->where('key', 'smtp_password')
-            ->first();
-        $smtpEncryption = $db->table('settings')
-            ->select(['value'])
-            ->where('key', 'smtp_encryption')
-            ->first();
+        // Load email configuration from database (1 query instead of 7!)
+        $settings = getSettings($db, [
+            'email_from_address',
+            'email_from_name',
+            'smtp_host',
+            'smtp_port',
+            'smtp_username',
+            'smtp_password',
+            'smtp_encryption'
+        ]);
 
         $smtpConfig = null;
-        if (!empty($smtpHost['value'] ?? '')) {
+        if (!empty($settings['smtp_host'] ?? '')) {
             $smtpConfig = [
-                'host' => $smtpHost['value'] ?? '',
-                'port' => $smtpPort['value'] ?? 587,
-                'username' => $smtpUsername['value'] ?? '',
-                'password' => $smtpPassword['value'] ?? '',
-                'encryption' => $smtpEncryption['value'] ?? 'tls'
+                'host' => $settings['smtp_host'] ?? '',
+                'port' => $settings['smtp_port'] ?? 587,
+                'username' => $settings['smtp_username'] ?? '',
+                'password' => $settings['smtp_password'] ?? '',
+                'encryption' => $settings['smtp_encryption'] ?? 'tls'
             ];
         }
 
         $emailConfig = [
-            'from_email' => $fromEmail['value'] ?? '',
-            'from_name' => $fromName['value'] ?? ''
+            'from_email' => $settings['email_from_address'] ?? '',
+            'from_name' => $settings['email_from_name'] ?? ''
         ];
 
         // Create email instance with SMTP config
@@ -180,46 +155,25 @@ function handleEmailAdminRoutes(string $method, string $path, Database $db): boo
 {
     // Get email settings
     if ($path === '/email-settings' && $method === 'GET') {
-        // Get settings from database
-        $fromEmail = $db->table('settings')
-            ->select(['value'])
-            ->where('key', 'email_from_address')
-            ->first();
-        $fromName = $db->table('settings')
-            ->select(['value'])
-            ->where('key', 'email_from_name')
-            ->first();
-
-        // Get SMTP settings
-        $smtpHost = $db->table('settings')
-            ->select(['value'])
-            ->where('key', 'smtp_host')
-            ->first();
-        $smtpPort = $db->table('settings')
-            ->select(['value'])
-            ->where('key', 'smtp_port')
-            ->first();
-        $smtpUsername = $db->table('settings')
-            ->select(['value'])
-            ->where('key', 'smtp_username')
-            ->first();
-        $smtpPassword = $db->table('settings')
-            ->select(['value'])
-            ->where('key', 'smtp_password')
-            ->first();
-        $smtpEncryption = $db->table('settings')
-            ->select(['value'])
-            ->where('key', 'smtp_encryption')
-            ->first();
+        // Get settings from database (1 query instead of 7!)
+        $settings = getSettings($db, [
+            'email_from_address',
+            'email_from_name',
+            'smtp_host',
+            'smtp_port',
+            'smtp_username',
+            'smtp_password',
+            'smtp_encryption'
+        ]);
 
         sendJson([
-            'from_email' => $fromEmail['value'] ?? '',
-            'from_name' => $fromName['value'] ?? '',
-            'smtp_host' => $smtpHost['value'] ?? '',
-            'smtp_port' => $smtpPort['value'] ?? '587',
-            'smtp_username' => $smtpUsername['value'] ?? '',
-            'smtp_password' => $smtpPassword['value'] ?? '',
-            'smtp_encryption' => $smtpEncryption['value'] ?? 'tls'
+            'from_email' => $settings['email_from_address'] ?? '',
+            'from_name' => $settings['email_from_name'] ?? '',
+            'smtp_host' => $settings['smtp_host'] ?? '',
+            'smtp_port' => $settings['smtp_port'] ?? '587',
+            'smtp_username' => $settings['smtp_username'] ?? '',
+            'smtp_password' => $settings['smtp_password'] ?? '',
+            'smtp_encryption' => $settings['smtp_encryption'] ?? 'tls'
         ]);
         return true;
     }
@@ -229,12 +183,7 @@ function handleEmailAdminRoutes(string $method, string $path, Database $db): boo
         $data = getJsonBody();
 
         // Validate required fields
-        $required = ['from_email', 'from_name', 'smtp_host', 'smtp_port', 'smtp_username', 'smtp_password'];
-        foreach ($required as $field) {
-            if (!isset($data[$field]) || empty($data[$field])) {
-                sendError("{$field} is required", 400);
-            }
-        }
+        requireFields($data, ['from_email', 'from_name', 'smtp_host', 'smtp_port', 'smtp_username', 'smtp_password']);
 
         // Validate email
         if (!filter_var($data['from_email'], FILTER_VALIDATE_EMAIL)) {
@@ -246,38 +195,16 @@ function handleEmailAdminRoutes(string $method, string $path, Database $db): boo
             sendError('Invalid smtp_port', 400);
         }
 
-        // Helper function to save setting
-        $saveSetting = function($key, $value) use ($db) {
-            $existing = $db->table('settings')
-                ->where('key', $key)
-                ->first();
-
-            if ($existing) {
-                $db->table('settings')
-                    ->where('key', $key)
-                    ->update([
-                        'value' => $value,
-                        'updated_at' => date('Y-m-d H:i:s')
-                    ]);
-            } else {
-                $db->table('settings')->insert([
-                    'key' => $key,
-                    'value' => $value,
-                    'updated_at' => date('Y-m-d H:i:s')
-                ]);
-            }
-        };
-
         // Save basic email settings
-        $saveSetting('email_from_address', $data['from_email']);
-        $saveSetting('email_from_name', $data['from_name']);
+        saveSetting($db, 'email_from_address', $data['from_email']);
+        saveSetting($db, 'email_from_name', $data['from_name']);
 
         // Save SMTP settings (required)
-        $saveSetting('smtp_host', $data['smtp_host']);
-        $saveSetting('smtp_port', $data['smtp_port']);
-        $saveSetting('smtp_username', $data['smtp_username']);
-        $saveSetting('smtp_password', $data['smtp_password']);
-        $saveSetting('smtp_encryption', $data['smtp_encryption'] ?? 'tls');
+        saveSetting($db, 'smtp_host', $data['smtp_host']);
+        saveSetting($db, 'smtp_port', $data['smtp_port']);
+        saveSetting($db, 'smtp_username', $data['smtp_username']);
+        saveSetting($db, 'smtp_password', $data['smtp_password']);
+        saveSetting($db, 'smtp_encryption', $data['smtp_encryption'] ?? 'tls');
 
         sendJson([
             'success' => true,

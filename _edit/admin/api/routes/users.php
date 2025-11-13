@@ -29,9 +29,7 @@ function handleUserRoutes(string $method, string $path, Database $db, Auth $auth
     // Create new user (admin only)
     if ($path === '/users' && $method === 'POST') {
         $data = getJsonBody();
-        if (!isset($data['email']) || !isset($data['password']) || !isset($data['name'])) {
-            sendError('Email, password, and name required', 400);
-        }
+        requireFields($data, ['email', 'password', 'name']);
 
         try {
             $newUserId = $auth->register($data['email'], $data['password'], $data['name']);
@@ -51,9 +49,7 @@ function handleUserRoutes(string $method, string $path, Database $db, Auth $auth
         $targetUserId = (int)$matches[1];
         $data = getJsonBody();
 
-        if (!isset($data['password']) || empty($data['password'])) {
-            sendError('Password required', 400);
-        }
+        requireFields($data, ['password']);
 
         $passwordHash = password_hash($data['password'], PASSWORD_DEFAULT);
         $db->table('users')
