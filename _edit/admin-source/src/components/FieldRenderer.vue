@@ -32,7 +32,7 @@
       <input type="checkbox"
              :checked="modelValue"
              @change="$emit('update:modelValue', $event.target.checked)"
-             class="checkbox">
+             class="toggle">
       <span class="label-text">{{ field.label }}</span>
     </label>
 
@@ -77,12 +77,11 @@
            class="input w-full">
 
     <!-- HTML/WYSIWYG Field -->
-    <textarea v-else-if="field.type === 'html' || field.type === 'wysiwyg'"
-              :value="modelValue"
-              :required="field.required"
-              rows="10"
-              @input="$emit('update:modelValue', $event.target.value)"
-              class="textarea w-full font-mono text-sm"></textarea>
+    <WysiwygField
+      v-else-if="field.type === 'html' || field.type === 'wysiwyg'"
+      :model-value="modelValue"
+      @update:model-value="$emit('update:modelValue', $event)"
+    />
 
     <!-- Media Field -->
     <MediaField
@@ -120,6 +119,7 @@
 <script setup>
 import FormField from './FormField.vue'
 import MediaField from './MediaField.vue'
+import WysiwygField from './WysiwygField.vue'
 
 defineProps({
   field: {

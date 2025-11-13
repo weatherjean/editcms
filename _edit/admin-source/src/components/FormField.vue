@@ -4,7 +4,7 @@
       {{ label }}
       <span v-if="required" class="text-error ml-1">*</span>
     </legend>
-    <p v-if="instructions" class="text-sm opacity-60 mb-2">{{ instructions }}</p>
+    <p v-if="instructions" class="opacity-60 mb-2">{{ instructions }}</p>
     <slot></slot>
   </fieldset>
 </template>

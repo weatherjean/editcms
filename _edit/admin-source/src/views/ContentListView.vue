@@ -3,10 +3,10 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold">{{ currentPostType?.label_plural || 'Content' }}</h1>
-        <p class="text-sm opacity-60 mt-1">Manage your {{ currentPostType?.label_plural?.toLowerCase() }}</p>
+        <p class="opacity-60 mt-1">Manage your {{ currentPostType?.label_plural?.toLowerCase() }}</p>
       </div>
       <button @click="createContent" class="btn btn-primary gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
         </svg>
         Add {{ currentPostType?.label }}
@@ -38,12 +38,12 @@
                 </span>
               </td>
               <td>
-                <div class="text-sm opacity-60">{{ formatDate(item.created_at) }}</div>
+                <div class="opacity-60">{{ formatDate(item.created_at) }}</div>
               </td>
               <td class="text-right">
                 <div class="join">
-                  <button @click="editContent(item.id)" class="btn btn-sm btn-neutral join-item">Edit</button>
-                  <button @click="deleteContent(item.id)" class="btn btn-sm btn-error join-item">Delete</button>
+                  <button @click="editContent(item.id)" class="btn btn-neutral join-item">Edit</button>
+                  <button @click="deleteContent(item.id)" class="btn btn-error join-item">Delete</button>
                 </div>
               </td>
             </tr>
@@ -54,7 +54,7 @@
 
     <div v-else class="card bg-base-100 border shadow">
       <div class="card-body items-center text-center py-16">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-16 h-16 opacity-40 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" class="size-16 opacity-40 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
         <h3 class="text-lg font-semibold mb-2">No {{ currentPostType?.label_plural?.toLowerCase() }} yet</h3>

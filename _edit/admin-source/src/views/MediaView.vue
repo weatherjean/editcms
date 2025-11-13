@@ -3,10 +3,10 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold">Media Library</h1>
-        <p class="text-sm opacity-60 mt-1">Manage your images and files</p>
+        <p class="opacity-60 mt-1">Manage your images and files</p>
       </div>
       <button @click="$refs.fileInput.click()" class="btn btn-primary gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
         </svg>
         Upload
@@ -29,7 +29,7 @@
             <tr v-for="item in mediaItems" :key="item.id" class="hover">
               <td>
                 <div class="avatar">
-                  <div class="w-12 h-12 rounded">
+                  <div class="size-24 rounded">
                     <img :src="item.url" :alt="item.filename" class="object-cover">
                   </div>
                 </div>
@@ -38,25 +38,25 @@
                 <div class="font-mono">{{ item.filename }}</div>
               </td>
               <td>
-                <div class="font-mono text-sm opacity-60 max-w-xs truncate" :title="item.url">
+                <div class="font-mono opacity-60 max-w-xs truncate" :title="item.url">
                   {{ item.url }}
                 </div>
               </td>
               <td class="text-right">
                 <div class="join">
-                  <button @click="copyUrl(item.url)" class="btn btn-sm btn-neutral join-item" title="Copy URL">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <button @click="copyUrl(item.url)" class="btn btn-neutral join-item" title="Copy URL">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 20 20" fill="currentColor">
                       <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
                       <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
                     </svg>
                   </button>
-                  <a :href="item.url" download :download="item.filename" class="btn btn-sm btn-info join-item" title="Download">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <a :href="item.url" download :download="item.filename" class="btn btn-info join-item" title="Download">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
                     </svg>
                   </a>
-                  <button @click="deleteMedia(item.id)" class="btn btn-sm btn-error join-item" title="Delete">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <button @click="deleteMedia(item.id)" class="btn btn-error join-item" title="Delete">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
                     </svg>
                   </button>
@@ -70,7 +70,7 @@
 
     <div v-else class="card bg-base-100 border shadow">
       <div class="card-body items-center text-center py-16">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-16 h-16 opacity-40 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" class="size-16 opacity-40 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
         <h3 class="text-lg font-semibold mb-2">No media files yet</h3>

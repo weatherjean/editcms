@@ -3,17 +3,17 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold">Configuration</h1>
-        <p class="text-sm opacity-60 mt-1">Manage modules, field groups, and content blocks</p>
+        <p class="opacity-60 mt-1">Manage modules, field groups, and content blocks</p>
       </div>
       <div class="flex gap-2">
-        <button @click="exportAll" class="btn btn-sm gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+        <button @click="exportAll" class="btn gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
           </svg>
           Export All
         </button>
-        <label class="btn btn-sm btn-primary gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+        <label class="btn btn-primary gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
           </svg>
           Import All
@@ -32,10 +32,10 @@
         <div class="card-body">
           <div class="flex items-center justify-between mb-4">
             <div>
-              <h2 class="card-title">📦 Post Types</h2>
-              <p class="text-sm opacity-60">Content types with their specific field groups</p>
+              <h2 class="card-title">Post Types</h2>
+              <p class="opacity-60">Content types with their specific field groups</p>
             </div>
-            <button @click="createPostType" class="btn btn-sm btn-primary gap-2">
+            <button @click="createPostType" class="btn btn-primary gap-2">
               + Create Post Type
             </button>
           </div>
@@ -58,20 +58,20 @@
                 <tr v-for="module in modules" :key="module.file.filename">
                   <td>
                     <div class="font-semibold">{{ module.data.post_types[0]?.label || 'Unknown' }}</div>
-                    <div class="text-xs font-mono opacity-60">{{ module.data.post_types[0]?.key }}</div>
+                    <div class="font-mono opacity-60">{{ module.data.post_types[0]?.key }}</div>
                   </td>
                   <td>
-                    <div class="text-sm">{{ module.data.post_types[0]?.label_plural || '-' }}</div>
-                    <span v-if="module.data.post_types[0]?.allow_open" class="badge badge-xs">Flexible</span>
+                    <div>{{ module.data.post_types[0]?.label_plural || '-' }}</div>
+                    <span v-if="module.data.post_types[0]?.allow_open" class="badge">Flexible</span>
                   </td>
                   <td>
-                    <div class="text-sm">{{ module.data.field_groups?.length || 0 }} group(s)</div>
+                    <div>{{ module.data.field_groups?.length || 0 }} group(s)</div>
                   </td>
                   <td class="text-right">
                     <div class="join">
-                      <button @click="editPostType(module)" class="btn btn-ghost btn-sm join-item">Edit</button>
-                      <button @click="downloadFile('modules', module.file.name)" class="btn btn-ghost btn-sm join-item">Download</button>
-                      <button @click="confirmDelete('modules', module.file)" class="btn btn-ghost btn-sm btn-error join-item">Delete</button>
+                      <button @click="editPostType(module)" class="btn btn-ghost join-item">Edit</button>
+                      <button @click="downloadFile('modules', module.file.name)" class="btn btn-ghost join-item">Download</button>
+                      <button @click="confirmDelete('modules', module.file)" class="btn btn-ghost btn-error join-item">Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -86,10 +86,10 @@
         <div class="card-body">
           <div class="flex items-center justify-between mb-4">
             <div>
-              <h2 class="card-title">🏷️ Shared Field Groups</h2>
-              <p class="text-sm opacity-60">Reusable field collections</p>
+              <h2 class="card-title">Shared Field Groups</h2>
+              <p class="opacity-60">Reusable field collections</p>
             </div>
-            <button @click="createFieldGroup" class="btn btn-sm btn-primary gap-2">
+            <button @click="createFieldGroup" class="btn btn-primary gap-2">
               + Create Field Group
             </button>
           </div>
@@ -112,21 +112,21 @@
                 <tr v-for="fg in fieldGroups" :key="fg.file.filename">
                   <td>
                     <div class="font-semibold">{{ fg.data.title || 'Unknown' }}</div>
-                    <div class="text-xs font-mono opacity-60">{{ fg.data.key }}</div>
+                    <div class="font-mono opacity-60">{{ fg.data.key }}</div>
                   </td>
                   <td>
                     <div class="flex flex-wrap gap-1">
-                      <span v-for="loc in fg.data.locations" :key="loc" class="badge badge-xs">{{ loc }}</span>
+                      <span v-for="loc in fg.data.locations" :key="loc" class="badge">{{ loc }}</span>
                     </div>
                   </td>
                   <td>
-                    <div class="text-sm">{{ fg.data.fields?.length || 0 }} field(s)</div>
+                    <div>{{ fg.data.fields?.length || 0 }} field(s)</div>
                   </td>
                   <td class="text-right">
                     <div class="join">
-                      <button @click="editFieldGroup(fg)" class="btn btn-ghost btn-sm join-item">Edit</button>
-                      <button @click="downloadFile('field-groups', fg.file.name)" class="btn btn-ghost btn-sm join-item">Download</button>
-                      <button @click="confirmDelete('field-groups', fg.file)" class="btn btn-ghost btn-sm btn-error join-item">Delete</button>
+                      <button @click="editFieldGroup(fg)" class="btn btn-ghost join-item">Edit</button>
+                      <button @click="downloadFile('field-groups', fg.file.name)" class="btn btn-ghost join-item">Download</button>
+                      <button @click="confirmDelete('field-groups', fg.file)" class="btn btn-ghost btn-error join-item">Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -141,10 +141,10 @@
         <div class="card-body">
           <div class="flex items-center justify-between mb-4">
             <div>
-              <h2 class="card-title">🧱 Content Blocks</h2>
-              <p class="text-sm opacity-60">Flexible content building blocks</p>
+              <h2 class="card-title">Content Blocks</h2>
+              <p class="opacity-60">Flexible content building blocks</p>
             </div>
-            <button @click="createBlock" class="btn btn-sm btn-primary gap-2">
+            <button @click="createBlock" class="btn btn-primary gap-2">
               + Create Block
             </button>
           </div>
@@ -166,21 +166,21 @@
                 <tr v-for="block in blocks" :key="block.file.filename">
                   <td>
                     <div class="flex items-center gap-2">
-                      <span class="text-2xl">{{ block.data.icon || '📦' }}</span>
+                      <span class="text-2xl">{{ block.data.icon }}</span>
                       <div>
                         <div class="font-semibold">{{ block.data.label || 'Unknown' }}</div>
-                        <div class="text-xs font-mono opacity-60">{{ block.data.key }}</div>
+                        <div class="font-mono opacity-60">{{ block.data.key }}</div>
                       </div>
                     </div>
                   </td>
                   <td>
-                    <div class="text-sm">{{ block.data.fields?.length || 0 }} field(s)</div>
+                    <div>{{ block.data.fields?.length || 0 }} field(s)</div>
                   </td>
                   <td class="text-right">
                     <div class="join">
-                      <button @click="editBlock(block)" class="btn btn-ghost btn-sm join-item">Edit</button>
-                      <button @click="downloadFile('blocks', block.file.name)" class="btn btn-ghost btn-sm join-item">Download</button>
-                      <button @click="confirmDelete('blocks', block.file)" class="btn btn-ghost btn-sm btn-error join-item">Delete</button>
+                      <button @click="editBlock(block)" class="btn btn-ghost join-item">Edit</button>
+                      <button @click="downloadFile('blocks', block.file.name)" class="btn btn-ghost join-item">Download</button>
+                      <button @click="confirmDelete('blocks', block.file)" class="btn btn-ghost btn-error join-item">Delete</button>
                     </div>
                   </td>
                 </tr>

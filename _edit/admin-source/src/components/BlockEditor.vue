@@ -2,7 +2,7 @@
   <dialog ref="dialogRef" class="modal">
     <div class="modal-box max-w-4xl">
       <form method="dialog">
-        <button class="btn btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        <button class="btn btn-circle btn-ghost absolute right-2 top-2"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
       </form>
 
       <h3 class="font-bold text-lg mb-4">{{ isEditing ? 'Edit' : 'Create' }} Block</h3>
@@ -21,7 +21,7 @@
               pattern="[a-z0-9_]+"
               required
             >
-            <p class="text-sm opacity-60 mt-1">Lowercase with underscores only</p>
+            <p class="opacity-60 mt-1">Lowercase with underscores only</p>
           </fieldset>
 
           <fieldset class="fieldset">
@@ -30,7 +30,7 @@
               type="text"
               v-model="form.icon"
               class="input w-full"
-              placeholder="🎯"
+              placeholder=""
               maxlength="2"
             >
           </fieldset>

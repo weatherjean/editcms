@@ -2,7 +2,7 @@
   <dialog ref="dialogRef" class="modal">
     <div class="modal-box max-w-4xl">
       <form method="dialog">
-        <button class="btn btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        <button class="btn btn-circle btn-ghost absolute right-2 top-2"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
       </form>
 
       <h3 class="font-bold text-lg mb-4">{{ isEditing ? 'Edit' : 'Create' }} Field Group</h3>
@@ -20,7 +20,7 @@
             pattern="[a-z0-9_]+"
             required
           >
-          <p class="text-sm opacity-60 mt-1">Lowercase with underscores only</p>
+          <p class="opacity-60 mt-1">Lowercase with underscores only</p>
         </fieldset>
 
         <fieldset class="fieldset">
@@ -49,7 +49,7 @@
           <label class="label">
             <span class="label-text font-semibold">Locations *</span>
           </label>
-          <p class="text-sm opacity-60 mb-2">Select which post types should use this field group</p>
+          <p class="opacity-60 mb-2">Select which post types should use this field group</p>
           <div class="flex flex-wrap gap-2">
             <label
               v-for="postType in availablePostTypes"
@@ -66,7 +66,7 @@
               <span class="label-text">{{ postType.label }}</span>
             </label>
           </div>
-          <p v-if="availablePostTypes.length === 0" class="text-sm opacity-60">
+          <p v-if="availablePostTypes.length === 0" class="opacity-60">
             No post types available. Create a post type first.
           </p>
         </div>

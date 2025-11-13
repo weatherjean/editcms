@@ -11,6 +11,7 @@
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
     "monaco-editor": "^0.54.0",
+    "quill": "^2.0.3",
     "vite-plugin-monaco-editor": "^1.1.0",
     "vue": "^3.5.22",
     "vue-router": "^4.6.3"

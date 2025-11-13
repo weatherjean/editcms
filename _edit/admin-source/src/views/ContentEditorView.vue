@@ -6,7 +6,7 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold">{{ isCreating ? 'New' : 'Edit' }} {{ currentPostType?.label }}</h1>
-        <p class="text-sm opacity-60 mt-1">{{ isCreating ? 'Create a new' : 'Edit this' }} {{ currentPostType?.label?.toLowerCase() }}</p>
+        <p class="opacity-60 mt-1">{{ isCreating ? 'Create a new' : 'Edit this' }} {{ currentPostType?.label?.toLowerCase() }}</p>
       </div>
       <div class="join">
         <button type="button" @click="goBack" class="btn btn-neutral join-item">Cancel</button>
@@ -22,7 +22,7 @@
           <div class="card-body space-y-6">
             <div>
               <h2 class="card-title">{{ fieldGroup.title }}</h2>
-              <p v-if="fieldGroup.description" class="text-sm opacity-60 mt-1">{{ fieldGroup.description }}</p>
+              <p v-if="fieldGroup.description" class="opacity-60 mt-1">{{ fieldGroup.description }}</p>
             </div>
 
             <div v-for="field in fieldGroup.fields" :key="field.key">
@@ -63,7 +63,7 @@
 
         <div v-if="assignedFieldGroups.length === 0 && !currentPostType?.allow_open" class="card bg-base-100 border shadow">
           <div class="card-body items-center text-center py-16">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-16 h-16 opacity-40 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="opacity-40 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <h3 class="text-lg font-semibold mb-2">No fields configured</h3>

@@ -1,12 +1,6 @@
 @import "tailwindcss";
 @plugin "daisyui";
 
-@theme {
-  --font-size-xs: 1rem; /* 16px instead of 12px */
-  --font-size-sm: 1.125rem; /* 18px instead of 14px */
-  --font-size-base: 1.25rem; /* 20px instead of 16px */
-}
-
 @plugin "daisyui/theme" {
   name: "light";
   default: true;

@@ -2,7 +2,7 @@
   <dialog ref="dialogRef" class="modal">
     <div class="modal-box max-w-6xl max-h-[90vh] overflow-y-auto">
       <form method="dialog">
-        <button class="btn btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        <button class="btn btn-circle btn-ghost absolute right-2 top-2"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
       </form>
 
       <h3 class="font-bold text-lg mb-4">{{ isEditing ? 'Edit' : 'Create' }} Post Type</h3>
@@ -24,7 +24,7 @@
                 pattern="[a-z0-9_]+"
                 required
               >
-              <p class="text-sm opacity-60 mt-1">Lowercase with underscores only</p>
+              <p class="opacity-60 mt-1">Lowercase with underscores only</p>
             </fieldset>
 
             <div class="grid grid-cols-2 gap-4">
@@ -72,12 +72,13 @@
                 >
               </fieldset>
 
-              <div class="flex items-center">
-                <label class="label cursor-pointer gap-2">
-                  <input type="checkbox" v-model="form.allow_open" class="checkbox">
+              <fieldset class="fieldset">
+                <legend class="fieldset-legend">Options</legend>
+                <label class="label cursor-pointer justify-start gap-4">
+                  <input type="checkbox" v-model="form.allow_open" class="toggle">
                   <span class="label-text">Allow Flexible Content (Blocks)</span>
                 </label>
-              </div>
+              </fieldset>
             </div>
           </div>
         </div>
@@ -87,12 +88,12 @@
           <div class="card-body">
             <div class="flex items-center justify-between mb-3">
               <h4 class="font-semibold">Field Groups</h4>
-              <button type="button" @click="addFieldGroup" class="btn btn-sm btn-outline">
+              <button type="button" @click="addFieldGroup" class="btn btn-outline">
                 + Add Field Group
               </button>
             </div>
 
-            <p class="text-sm opacity-60 mb-4">
+            <p class="opacity-60 mb-4">
               Define field groups specific to this post type.
               For reusable field groups (like SEO), create them separately in the Field Groups section.
             </p>
@@ -107,7 +108,7 @@
                       <button
                         type="button"
                         @click="editingGroupIndex = editingGroupIndex === groupIndex ? null : groupIndex"
-                        class="btn btn-sm btn-ghost"
+                        class="btn btn-ghost"
                         :class="{ 'btn-active': editingGroupIndex === groupIndex }"
                       >
                         {{ editingGroupIndex === groupIndex ? 'Collapse' : 'Expand' }}
@@ -115,7 +116,7 @@
                       <button
                         type="button"
                         @click="removeFieldGroup(groupIndex)"
-                        class="btn btn-sm btn-error btn-ghost"
+                        class="btn btn-error btn-ghost"
                       >
                         Remove
                       </button>
@@ -156,12 +157,12 @@
                       ></textarea>
                     </fieldset>
 
-                    <div class="divider text-sm">Fields</div>
+                    <div class="divider">Fields</div>
 
                     <FieldBuilder v-model="group.fields" :available-post-types="allPostTypes" />
                   </div>
 
-                  <div v-else class="text-sm opacity-60">
+                  <div v-else class="opacity-60">
                     {{ group.fields?.length || 0 }} field(s) - Click expand to edit
                   </div>
                 </div>
@@ -171,7 +172,7 @@
             <!-- Empty State -->
             <div v-else class="card bg-base-100 border-2 border-dashed">
               <div class="card-body items-center text-center py-8">
-                <p class="text-sm opacity-60">No field groups added yet</p>
+                <p class="opacity-60">No field groups added yet</p>
               </div>
             </div>
           </div>

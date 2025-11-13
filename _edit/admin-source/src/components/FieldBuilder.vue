@@ -15,36 +15,36 @@
                 type="button"
                 @click="moveField(index, -1)"
                 :disabled="index === 0"
-                class="btn btn-sm btn-ghost"
+                class="btn btn-ghost"
                 title="Move Up"
               >
-                <span class="text-lg">↑</span>
+                Up
               </button>
               <button
                 type="button"
                 @click="moveField(index, 1)"
                 :disabled="index === fields.length - 1"
-                class="btn btn-sm btn-ghost"
+                class="btn btn-ghost"
                 title="Move Down"
               >
-                <span class="text-lg">↓</span>
+                Down
               </button>
               <button
                 type="button"
                 @click="editingIndex = editingIndex === index ? null : index"
-                class="btn btn-sm btn-ghost"
+                class="btn btn-ghost"
                 :class="{ 'btn-active': editingIndex === index }"
                 title="Edit"
               >
-                <span class="text-lg">✎</span>
+                Edit
               </button>
               <button
                 type="button"
                 @click="removeField(index)"
-                class="btn btn-sm btn-error btn-ghost"
+                class="btn btn-error btn-ghost"
                 title="Remove"
               >
-                <span class="text-lg">✕</span>
+                Delete
               </button>
             </div>
           </div>
@@ -88,8 +88,8 @@
             </fieldset>
 
             <div class="flex gap-4">
-              <label class="label cursor-pointer gap-2">
-                <input type="checkbox" v-model="field.required" class="checkbox">
+              <label class="label cursor-pointer gap-4">
+                <input type="checkbox" v-model="field.required" class="toggle">
                 <span class="label-text">Required</span>
               </label>
             </div>
@@ -106,7 +106,7 @@
                 rows="4"
                 placeholder="value1 : Label 1&#10;value2 : Label 2&#10;value3 : Label 3"
               ></textarea>
-              <p class="text-sm opacity-60">Format: value : Label (one per line)</p>
+              <p class="opacity-60">Format: value : Label (one per line)</p>
             </div>
 
             <div v-if="field.type === 'number'" class="grid grid-cols-3 gap-2">
@@ -137,8 +137,8 @@
             </div>
 
             <div v-if="field.type === 'media'">
-              <label class="label cursor-pointer gap-2">
-                <input type="checkbox" v-model="field.config.multiple" class="checkbox">
+              <label class="label cursor-pointer gap-4">
+                <input type="checkbox" v-model="field.config.multiple" class="toggle">
                 <span class="label-text">Allow Multiple</span>
               </label>
             </div>
@@ -174,12 +174,12 @@
       class="btn btn-outline w-full"
       :disabled="depth > 2"
     >
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+      <svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 20 20" fill="currentColor">
         <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
       </svg>
       Add Field
     </button>
-    <p v-if="depth > 2" class="text-sm text-center opacity-60">Maximum nesting depth reached</p>
+    <p v-if="depth > 2" class="text-center opacity-60">Maximum nesting depth reached</p>
   </div>
 </template>
 

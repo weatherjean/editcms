@@ -3,7 +3,7 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold">Email</h1>
-        <p class="text-sm opacity-60 mt-1">Configure email settings and view send logs</p>
+        <p class="opacity-60 mt-1">Configure email settings and view send logs</p>
       </div>
     </div>
 
@@ -11,8 +11,8 @@
     <div class="card bg-base-100 border shadow">
       <div class="card-body">
         <div class="mb-4">
-          <h2 class="card-title">📧 Email Configuration</h2>
-          <p class="text-sm opacity-60">Configure the default sender for outgoing emails (used for contact forms, etc.)</p>
+          <h2 class="card-title">Email Configuration</h2>
+          <p class="opacity-60">Configure the default sender for outgoing emails (used for contact forms, etc.)</p>
         </div>
 
         <form @submit.prevent="saveEmailSettings" class="space-y-4">
@@ -25,7 +25,7 @@
               class="input w-full"
               placeholder="noreply@example.com"
             />
-            <p class="text-xs opacity-60 mt-1">The email address that appears as the sender</p>
+            <p class="opacity-60 mt-1">The email address that appears as the sender</p>
           </fieldset>
 
           <fieldset class="fieldset">
@@ -37,13 +37,13 @@
               class="input w-full"
               placeholder="My Website"
             />
-            <p class="text-xs opacity-60 mt-1">The name that appears as the sender</p>
+            <p class="opacity-60 mt-1">The name that appears as the sender</p>
           </fieldset>
 
           <!-- SMTP Configuration -->
           <div class="divider">SMTP Configuration (Required)</div>
 
-          <p class="text-sm opacity-60 -mt-2 mb-4">SMTP is required for email delivery. Get credentials from your email service provider (Gmail, SendGrid, Mailgun, etc.)</p>
+          <p class="opacity-60 -mt-2 mb-4">SMTP is required for email delivery. Get credentials from your email service provider (Gmail, SendGrid, Mailgun, etc.)</p>
 
           <fieldset class="fieldset">
             <legend class="fieldset-legend">SMTP Host</legend>
@@ -54,7 +54,7 @@
               class="input w-full"
               placeholder="smtp.example.com"
             />
-            <p class="text-xs opacity-60 mt-1">SMTP server hostname (e.g., smtp.gmail.com, smtp.sendgrid.net)</p>
+            <p class="opacity-60 mt-1">SMTP server hostname (e.g., smtp.gmail.com, smtp.sendgrid.net)</p>
           </fieldset>
 
           <div class="grid grid-cols-2 gap-4">
@@ -67,7 +67,7 @@
                 class="input w-full"
                 placeholder="587"
               />
-              <p class="text-xs opacity-60 mt-1">Usually 587 (TLS) or 465 (SSL)</p>
+              <p class="opacity-60 mt-1">Usually 587 (TLS) or 465 (SSL)</p>
             </fieldset>
 
             <fieldset class="fieldset">
@@ -77,7 +77,7 @@
                 <option value="ssl">SSL</option>
                 <option value="">None</option>
               </select>
-              <p class="text-xs opacity-60 mt-1">Recommended: TLS</p>
+              <p class="opacity-60 mt-1">Recommended: TLS</p>
             </fieldset>
           </div>
 
@@ -91,7 +91,7 @@
               placeholder="username or email"
               autocomplete="off"
             />
-            <p class="text-xs opacity-60 mt-1">SMTP authentication username</p>
+            <p class="opacity-60 mt-1">SMTP authentication username</p>
           </fieldset>
 
           <fieldset class="fieldset">
@@ -104,7 +104,7 @@
               placeholder="••••••••"
               autocomplete="new-password"
             />
-            <p class="text-xs opacity-60 mt-1">SMTP authentication password</p>
+            <p class="opacity-60 mt-1">SMTP authentication password</p>
           </fieldset>
 
           <div class="flex gap-2">
@@ -113,7 +113,7 @@
               {{ saving ? 'Saving...' : 'Save Email Settings' }}
             </button>
             <button type="button" @click="testEmail" class="btn btn-outline" :disabled="testing">
-              <svg v-if="!testing" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+              <svg v-if="!testing" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
               </svg>
               <span v-if="testing" class="loading loading-spinner loading-sm"></span>
@@ -139,11 +139,11 @@
       <div class="card-body">
         <div class="flex items-center justify-between mb-4">
           <div>
-            <h2 class="card-title">📊 Email Send Logs</h2>
-            <p class="text-sm opacity-60">Recent email send attempts</p>
+            <h2 class="card-title">Email Send Logs</h2>
+            <p class="opacity-60">Recent email send attempts</p>
           </div>
-          <button @click="loadLogs" class="btn btn-sm gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+          <button @click="loadLogs" class="btn gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
             </svg>
             Refresh
@@ -171,24 +171,24 @@
             </thead>
             <tbody>
               <tr v-for="log in emailLogs" :key="log.id">
-                <td class="text-sm">
+                <td>
                   <div>{{ formatDate(log.created_at) }}</div>
-                  <div class="text-xs opacity-60">{{ formatTime(log.created_at) }}</div>
+                  <div class="opacity-60">{{ formatTime(log.created_at) }}</div>
                 </td>
-                <td class="text-sm">{{ log.to_address }}</td>
-                <td class="text-sm">{{ log.subject }}</td>
+                <td>{{ log.to_address }}</td>
+                <td>{{ log.subject }}</td>
                 <td>
                   <span v-if="log.success" class="badge badge-success badge-sm">Success</span>
                   <span v-else class="badge badge-error badge-sm" :title="log.error_message">Failed</span>
                 </td>
-                <td class="text-sm font-mono opacity-60">{{ log.ip_address || '-' }}</td>
+                <td class="font-mono opacity-60">{{ log.ip_address || '-' }}</td>
               </tr>
             </tbody>
           </table>
         </div>
 
         <div v-if="logsTotal > emailLogs.length" class="text-center mt-4">
-          <p class="text-sm opacity-60">Showing {{ emailLogs.length }} of {{ logsTotal }} logs</p>
+          <p class="opacity-60">Showing {{ emailLogs.length }} of {{ logsTotal }} logs</p>
         </div>
       </div>
     </div>

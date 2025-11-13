@@ -5,16 +5,16 @@
       <div class="card bg-base-100 border">
         <div class="card-body p-4 flex-row items-center gap-4">
           <div class="avatar">
-            <div class="w-16 h-16 rounded">
+            <div class="rounded">
               <img :src="mediaValue.url" :alt="mediaValue.filename" class="object-cover">
             </div>
           </div>
           <div class="flex-1">
-            <div class="font-mono text-sm">{{ mediaValue.filename }}</div>
+            <div class="font-mono">{{ mediaValue.filename }}</div>
           </div>
           <div class="join">
-            <button type="button" @click="$emit('select')" class="btn btn-sm btn-ghost join-item">Change</button>
-            <button type="button" @click="$emit('remove')" class="btn btn-sm btn-ghost join-item">Remove</button>
+            <button type="button" @click="$emit('select')" class="btn btn-ghost join-item">Change</button>
+            <button type="button" @click="$emit('remove')" class="btn btn-ghost join-item">Remove</button>
           </div>
         </div>
       </div>
@@ -22,7 +22,7 @@
 
     <!-- Show select button if no media selected -->
     <button v-else type="button" @click="$emit('select')" :class="buttonClass">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+      <svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 20 20" fill="currentColor">
         <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
       </svg>
       Select Media
@@ -60,7 +60,7 @@ const mediaValue = computed(() => {
 
 const buttonClass = computed(() => {
   return props.size === 'small'
-    ? 'btn btn-outline btn-sm w-full'
+    ? 'btn btn-outline w-full'
     : 'btn btn-outline w-full'
 })
 </script>
