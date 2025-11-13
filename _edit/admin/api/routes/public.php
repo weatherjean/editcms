@@ -24,7 +24,7 @@ function handlePublicRoutes(string $method, string $path, Database $db, ContentT
 
     // Serve API documentation
     if ($path === '/public/docs' && $method === 'GET') {
-        $docsPath = EDIT_BASE_PATH . '/PUBLIC-API.md';
+        $docsPath = EDIT_BASE_PATH . '/admin/PUBLIC-API.md';
         if (file_exists($docsPath)) {
             header('Content-Type: text/markdown; charset=utf-8');
             echo file_get_contents($docsPath);

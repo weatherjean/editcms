@@ -1,5 +1,3 @@
-# _edit CMS - Public Query API
-
 **Version:** 1.0
 **Base URL:** `/_edit/api/public`
 **Authentication:** None required

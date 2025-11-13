@@ -6,6 +6,7 @@ import MediaView from './views/MediaView.vue'
 import UsersView from './views/UsersView.vue'
 import EmailView from './views/EmailView.vue'
 import HealthView from './views/HealthView.vue'
+import DocumentationView from './views/DocumentationView.vue'
 
 const routes = [
   {
@@ -36,6 +37,11 @@ const routes = [
     path: '/health',
     name: 'health',
     component: HealthView
+  },
+  {
+    path: '/docs',
+    name: 'docs',
+    component: DocumentationView
   },
   {
     path: '/:type',
