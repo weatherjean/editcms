@@ -88,8 +88,6 @@ class Auth
             return null;
         }
 
-        $token = stripBearerPrefix($token);
-
         $session = $this->db->table('sessions')
             ->where('token', $token)
             ->first();
@@ -147,8 +145,6 @@ class Auth
         if (empty($token)) {
             return false;
         }
-
-        $token = stripBearerPrefix($token);
 
         $deleted = $this->db->table('sessions')
             ->where('token', $token)

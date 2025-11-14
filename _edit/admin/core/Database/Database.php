@@ -135,9 +135,6 @@ class Database
             $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_locked ON rate_limits(locked_until)");
         }
 
-        $this->execute("CREATE INDEX IF NOT EXISTS idx_meta_value ON content_meta(meta_value)");
-        $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_locked ON rate_limits(locked_until)");
-
         $sessionsCheck = $this->query(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'"
         );
@@ -382,6 +379,22 @@ class Database
         try {
             $this->execute(
                 "DELETE FROM sessions WHERE expires_at < datetime('now')"
+            );
+        } catch (\Exception $e) {
+            // Silently fail - cleanup is not critical
+        }
+    }
+
+    /**
+     * Clean up old rate limit records (> 1 hour old and not locked)
+     * This is called opportunistically during rate limit checks
+     */
+    public function cleanupOldRateLimits(string $oneHourAgo, string $currentTime): void
+    {
+        try {
+            $this->execute(
+                "DELETE FROM rate_limits WHERE window_start < ? AND (locked_until IS NULL OR locked_until < ?)",
+                [$oneHourAgo, $currentTime]
             );
         } catch (\Exception $e) {
             // Silently fail - cleanup is not critical

@@ -36,8 +36,9 @@ function getJsonBody(): ?array
 }
 
 /**
- * Get Authorization header from request
+ * Get Authorization header from request and strip Bearer prefix
  * Checks both HTTP_AUTHORIZATION and apache_request_headers() fallback
+ * Returns clean token without "Bearer " prefix
  */
 function getAuthHeader(): string
 {
@@ -48,15 +49,8 @@ function getAuthHeader(): string
         $authHeader = $headers['Authorization'] ?? '';
     }
 
-    return $authHeader;
-}
-
-/**
- * Strip "Bearer " prefix from auth token
- */
-function stripBearerPrefix(string $token): string
-{
-    return preg_replace('/^Bearer\s+/', '', $token);
+    // Strip "Bearer " prefix if present
+    return preg_replace('/^Bearer\s+/', '', $authHeader);
 }
 
 /**
@@ -75,10 +69,8 @@ function checkRateLimit(Database $db, string $endpoint, int $maxAttempts = 10, i
     $oneHourAgo = dateTime('-1 hour');
     $windowStart = dateTime("-{$windowMinutes} minutes");
 
-    $db->execute(
-        "DELETE FROM rate_limits WHERE window_start < ? AND (locked_until IS NULL OR locked_until < ?)",
-        [$oneHourAgo, $currentTime]
-    );
+    // Clean up old rate limit records opportunistically
+    $db->cleanupOldRateLimits($oneHourAgo, $currentTime);
 
     $lockCheck = $db->table('rate_limits')
         ->select(['locked_until'])
@@ -174,6 +166,7 @@ function getSettings(Database $db, array $keys): array
 
 /**
  * Validate required fields exist in data
+ * Accepts 0, '0', false as valid values - only rejects null, missing keys, and empty strings
  *
  * @param array $data Data to validate
  * @param array $required Required field names
@@ -184,7 +177,8 @@ function requireFields(array $data, array $required, int $statusCode = 400): voi
 {
     $missing = [];
     foreach ($required as $field) {
-        if (!isset($data[$field]) || $data[$field] === '' || $data[$field] === null) {
+        // isset() returns false for both missing keys and null values
+        if (!isset($data[$field]) || $data[$field] === '') {
             $missing[] = $field;
         }
     }

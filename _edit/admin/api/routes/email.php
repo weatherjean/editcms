@@ -193,7 +193,13 @@ function handleEmailAdminRoutes(string $method, string $path, Database $db): boo
         saveSetting($db, 'smtp_port', $data['smtp_port']);
         saveSetting($db, 'smtp_username', $data['smtp_username']);
 
-        if ($data['smtp_password'] !== '********') {
+        // Only update password if it's different from the masked value
+        // This allows updating even if the actual password is '********'
+        $currentSettings = getSettings($db, ['smtp_password']);
+        $currentEncryptedPassword = $currentSettings['smtp_password'] ?? '';
+        $maskedPassword = !empty($currentEncryptedPassword) ? '********' : '';
+
+        if ($data['smtp_password'] !== $maskedPassword || empty($currentEncryptedPassword)) {
             $encryptedPassword = Security::encrypt($data['smtp_password']);
             saveSetting($db, 'smtp_password', $encryptedPassword);
         }

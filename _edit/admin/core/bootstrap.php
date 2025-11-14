@@ -50,6 +50,17 @@ define('EDIT_SESSION_EXPIRY_HOURS', 24);
 define('EDIT_DEFAULT_PAGE_LIMIT', 10);
 define('EDIT_MAX_PAGE_LIMIT', 100);
 
+// File upload limits
+// IMPORTANT: Ensure php.ini has upload_max_filesize and post_max_size >= these values
+define('EDIT_MAX_FILE_SIZE', 50 * 1024 * 1024); // 50MB
+define('EDIT_MAX_IMAGE_WIDTH', 4000);
+define('EDIT_MAX_IMAGE_HEIGHT', 4000);
+
+// ZIP validation limits (for config import/export)
+define('EDIT_MAX_ZIP_COMPRESSED_SIZE', 10 * 1024 * 1024); // 10MB
+define('EDIT_MAX_ZIP_UNCOMPRESSED_SIZE', 50 * 1024 * 1024); // 50MB
+define('EDIT_MAX_ZIP_FILES', 1000);
+
 PHP;
     file_put_contents($configFile, $configContent);
 }

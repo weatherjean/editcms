@@ -129,11 +129,8 @@ async function deleteContent(id) {
   }
 }
 
+// Watch with immediate:true handles initial load and subsequent changes
 watch(currentType, () => {
   loadContent()
 }, { immediate: true })
-
-onMounted(() => {
-  loadContent()
-})
 </script>

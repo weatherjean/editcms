@@ -89,7 +89,7 @@ function getPublicContentBySlug(ContentType $contentType, ContentTypeRegistry $r
  */
 function getPublicContentList(ContentType $contentType, ContentTypeRegistry $registry, string $type): array
 {
-    $params = parsePublicQueryParams($_GET);
+    $params = parsePublicQueryParams($_GET, $registry->get($type));
 
     $filters = ['status' => 'published'];
 
@@ -134,8 +134,9 @@ function getPublicContentList(ContentType $contentType, ContentTypeRegistry $reg
 
 /**
  * Parse and validate query parameters
+ * Validates field names against content type schema to prevent SQL injection
  */
-function parsePublicQueryParams(array $query): array
+function parsePublicQueryParams(array $query, array $contentTypeConfig): array
 {
     $params = [
         'limit' => 10,
@@ -145,6 +146,14 @@ function parsePublicQueryParams(array $query): array
         'populate' => '',
         'field_filters' => []
     ];
+
+    // Build list of valid field keys from schema
+    $validFieldKeys = [];
+    foreach ($contentTypeConfig['field_groups'] as $group) {
+        foreach ($group['fields'] as $field) {
+            $validFieldKeys[] = $field['key'];
+        }
+    }
 
     if (isset($query['limit'])) {
         $limit = (int) $query['limit'];
@@ -191,6 +200,11 @@ function parsePublicQueryParams(array $query): array
                     'like' => 'LIKE',
                     'not' => '!=',
                 };
+            }
+
+            // Validate field key exists in schema (prevent SQL injection)
+            if (!in_array($fieldKey, $validFieldKeys)) {
+                sendError("Invalid field filter: '{$fieldKey}' is not a valid field for this content type", 400);
             }
 
             $params['field_filters'][] = [

@@ -42,6 +42,14 @@ function validateConfigJson(string $json, string $type): ?string {
 }
 
 /**
+ * Helper function to convert config type to validation type
+ * 'modules' => 'module', 'field-groups' => 'field-group', 'blocks' => 'block'
+ */
+function getValidationType(string $configType): string {
+    return $configType === 'field-groups' ? 'field-group' : rtrim($configType, 's');
+}
+
+/**
  * Configuration management routes (requires auth)
  *
  * Routes:
@@ -119,7 +127,7 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
         }
 
         $content = file_get_contents($file['tmp_name']);
-        $validationType = $type === 'field-groups' ? 'field-group' : rtrim($type, 's');
+        $validationType = getValidationType($type);
         $error = validateConfigJson($content, $validationType);
         if ($error) {
             sendError($error, 400);
@@ -275,7 +283,7 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
                     continue;
                 }
 
-                $validationType = $type === 'field-groups' ? 'field-group' : rtrim($type, 's');
+                $validationType = getValidationType($type);
                 $error = validateConfigJson($content, $validationType);
                 if ($error) {
                     $errors[] = "{$filename}: {$error}";
