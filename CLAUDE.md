@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-_edit CMS is a lightweight, ACF-style headless CMS built for shared hosting environments. It features a Vue 3 admin interface and a PHP backend with SQLite storage, requiring zero external dependencies (custom JWT auth, no composer packages).
+_edit CMS is a lightweight, ACF-style headless CMS built for shared hosting environments. It features a Vue 3 admin interface and a PHP backend with SQLite storage, requiring zero external dependencies (custom session-based auth, no composer packages).
 
 ## Development Commands
 
@@ -32,7 +32,7 @@ cd _edit/admin-source
 npm run build
 ```
 
-Built files go to `_edit/admin-dist/`. Deploy the entire `_edit/` directory to production.
+Built files go to `_edit/admin/dist/`. Deploy the entire `_edit/` directory to production.
 
 ### Database
 
@@ -66,19 +66,21 @@ The PHP router enforces a `/_edit/` prefix for all CMS requests:
    - Auto-creates schema on first run
 
 2. **Auth** (`_edit/admin/core/Auth/`)
-   - Custom JWT implementation (no libraries)
-   - JWT secret stored in `_edit/config/jwt-secret.txt`
+   - Custom session-based authentication (no libraries)
+   - Session tokens stored in database `sessions` table
+   - Cryptographically secure tokens generated with `random_bytes(32)`
    - Auth check: `$auth->verifyRequest()` returns user ID or false
 
 3. **Content Type System** (`_edit/admin/core/ContentTypes/`)
-   - **ContentTypeRegistry**: Loads post types and field groups from `_edit/config/config.json`
-   - **BlockRegistry**: Manages Gutenberg-style blocks
+   - **ContentTypeRegistry**: Loads post types and field groups from modular JSON files in `_edit/data/config/`
+   - **BlockRegistry**: Manages Gutenberg-style blocks from `_edit/data/config/blocks/`
    - **ContentType**: Handles CRUD for dynamic content types
-   - Post types and field groups are defined in JSON, NOT in database
+   - Post types and field groups are defined in modular JSON files, NOT in database
+   - Config structure: `modules/*.json` (post types + field groups), `field-groups/*.json` (shared), `blocks/*.json`
    - Registry combines post types with their assigned field groups to build content schemas
 
 4. **Field System** (`_edit/admin/core/Fields/`)
-   - 12 field types: Text, Textarea, Wysiwyg, Number, Boolean, Select, Date, Datetime, Slug, Media, Relationship, Repeater
+   - 13 field types: Text, Textarea, Wysiwyg, Html, Number, Boolean, Select, Date, Datetime, Slug, Media, Relationship, Repeater
    - All extend `BaseField` and implement `FieldType` interface
    - Each field handles validation, sanitization, and database serialization
    - Methods: `validate()`, `sanitize()`, `toDatabase()`, `fromDatabase()`
@@ -123,9 +125,12 @@ Main router loads individual route files and delegates to handler functions.
    - Reserved types: auth, users, media, config, email-settings, email-logs, send-email, post-types, field-groups, blocks, health, public
 
 5. **config.php** - Configuration management (requires auth)
-   - `GET /config` - Get config.json
-   - `PUT /config` - Update config.json
-   - `POST /config/import` - Import module/field-group/block
+   - `GET /config` - List all config files (modules, field-groups, blocks)
+   - `GET /config/{type}/{name}` - Get specific config file
+   - `POST /config/{type}` - Upload/replace config file
+   - `DELETE /config/{type}/{name}` - Delete config file
+   - `GET /config/export` - Export all config as ZIP
+   - `POST /config/import` - Import config from ZIP
    - `GET /post-types` - List post types
    - `GET /field-groups` - List field groups
    - `GET /blocks` - List blocks
@@ -168,7 +173,7 @@ Main router loads individual route files and delegates to handler functions.
 - `useAuth.js` - Authentication state management
 
 **Views:**
-- `ConfigView.vue` - JSON editor for config.json (Monaco Editor)
+- `ConfigView.vue` - Manages modular config files (modules, field groups, blocks)
 - `ContentListView.vue` - Lists content items for a post type
 - `ContentEditorView.vue` - Creates/edits content items
 - `MediaView.vue` - Media library management
@@ -192,23 +197,35 @@ Main router loads individual route files and delegates to handler functions.
 - Base path: `/_edit/admin/`
 - API proxy: `/_edit/api` → `http://localhost:8000`
 - Uploads proxy: `/_edit/uploads` → `http://localhost:8000`
-- Output dir: `../admin-dist`
+- Output dir: `../admin/dist`
 
 ### Configuration System
 
-**Single source of truth:** `_edit/config/config.json`
+**Modular JSON file structure:** `_edit/data/config/`
 
-This JSON file defines:
-- `post_types[]` - Content types with labels, icons, descriptions, supports
-- `field_groups[]` - Field collections with location rules
-- `blocks[]` - Gutenberg-style content blocks
+Configuration is split into three types of files:
 
-**Key Concept:** Post types and field groups are linked by `locations` array. A field group with `"locations": ["post"]` attaches its fields to the "post" content type.
+1. **Modules** (`_edit/data/config/modules/*.json`)
+   - Each module contains both post types and their field groups
+   - Example: `blog.json` defines "post" content type and "post_content" field group
+   - Post types define: key, label, label_plural, description, icon, allow_open
 
-ConfigView.vue provides a Monaco-based JSON editor for this file with:
-- Syntax validation
-- Import/export functionality
-- Module system for reusable configurations
+2. **Shared Field Groups** (`_edit/data/config/field-groups/*.json`)
+   - Reusable field groups that can be attached to multiple post types
+   - Example: `seo.json` provides SEO fields for any content type
+   - Override module-defined field groups if keys match
+
+3. **Blocks** (`_edit/data/config/blocks/*.json`)
+   - Gutenberg-style content blocks with their own field definitions
+   - Used by FlexibleContentField for block-based layouts
+
+**Key Concept:** Field groups use `locations` array to attach to post types. A field group with `"locations": ["post", "page"]` attaches its fields to both content types.
+
+ConfigView.vue provides file upload/download interface with:
+- Upload individual JSON files or ZIP archives
+- Export all configuration as ZIP
+- Automatic backup on import
+- JSON validation before saving
 
 ### Content Storage
 
@@ -293,6 +310,10 @@ Created automatically on first run:
    - id, ip_address, endpoint, attempts, window_start, locked_until
    - Unique constraint: (ip_address, endpoint)
 
+9. **sessions** - Authentication sessions
+   - id, token (unique), user_id, expires_at, created_at
+   - Foreign key: user_id → users(id)
+
 ## Development Patterns
 
 ### Adding a New Field Type
@@ -300,14 +321,15 @@ Created automatically on first run:
 1. Create `_edit/admin/core/Fields/[Type]Field.php` extending `BaseField`
 2. Implement `validate()`, `sanitize()`, `toDatabase()`, `fromDatabase()`
 3. Add rendering logic to `FieldRenderer.vue` for the new type
-4. Field will automatically work in content types once added to config.json
+4. Field will automatically work in content types once added to config JSON files
 
 ### Adding a New Post Type
 
-Edit `_edit/config/config.json`:
-1. Add entry to `post_types[]` array with key, labels, icon, supports
-2. Create field group(s) with matching location(s)
+Create a new module file `_edit/data/config/modules/[name].json`:
+1. Add entry to `post_types[]` array with key, labels, icon, allow_open
+2. Add field group(s) to `field_groups[]` array with matching location(s)
 3. No code changes needed - API routes generate automatically
+4. Alternatively, use ConfigView.vue to upload new module files
 
 ### Adding a New API Route
 
@@ -349,16 +371,16 @@ SELECT * FROM [table] LIMIT 10;  # Query data
 ## Important Constraints
 
 ### Security
-- All admin API routes require JWT auth (except public routes and auth endpoints)
+- All admin API routes require session-based auth (except public routes and auth endpoints)
 - Rate limiting on all public-facing endpoints
-- CSRF protection via JWT token validation
+- Session token validation prevents unauthorized access
 - SQL injection prevented via parameterized queries
 - XSS prevention via proper escaping in Vue templates
 - File upload restrictions (mime type, size)
 
 ### Data Integrity
 - Slugs must be unique per content type
-- Config.json must be valid JSON or the entire CMS breaks
+- Config JSON files must be valid or the CMS will not load those modules
 - First user registration auto-disabled after one user exists
 - Cannot delete last user or your own user account
 
@@ -369,9 +391,10 @@ SELECT * FROM [table] LIMIT 10;  # Query data
 - Modern browser with ES6+ support
 
 ### File System
-- `_edit/config/` must be writable (for config.json updates)
+- `_edit/data/config/` must be writable (for config JSON file uploads)
 - `_edit/uploads/` must be writable (for media uploads)
 - `_edit/data/database/` must be writable (for SQLite database)
+- `_edit/config/` must be writable (for config.php auto-generation on first run)
 
 ## API Response Format
 

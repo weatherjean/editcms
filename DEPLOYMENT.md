@@ -98,16 +98,16 @@ A user already exists. Log in with the existing account and create more users vi
 
 ✅ **Auto-Protected Directories**: `/database/`, `/config/`, `/core/` return 403 errors
 ✅ **Rate Limiting**: Login and email endpoints have exponential backoff
-✅ **JWT Authentication**: Secret auto-generated and stored securely in database
+✅ **Session Authentication**: Secure tokens auto-generated and stored in database sessions table
 ✅ **Registration Lock**: Automatically disables after first user is created
 
 ---
 
 ## Updating
 
-1. **Backup** your `database/`, `uploads/`, and `config/` folders
-2. **Replace** `core/`, `api/`, and `admin-dist/` with new versions
-3. **Keep** your `database/`, `uploads/`, and `config/` folders unchanged
+1. **Backup** your `data/database/`, `uploads/`, and `data/config/` folders
+2. **Replace** `admin/core/`, `admin/api/`, and `admin/dist/` with new versions
+3. **Keep** your `data/database/`, `uploads/`, and `data/config/` folders unchanged
 
 Database migrations run automatically on the first request after updating.
 

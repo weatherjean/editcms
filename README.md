@@ -6,10 +6,10 @@ A lightweight, ACF-style headless CMS built for shared hosting environments.
 
 - **ACF-Style Field Builder** - WordPress Advanced Custom Fields inspired interface
 - **Dynamic Content Types** - Create custom post types with flexible field groups
-- **12 Field Types** - Text, Textarea, WYSIWYG, Number, Boolean, Select, Date, DateTime, Slug, Media, Relationship, Repeater
+- **13 Field Types** - Text, Textarea, WYSIWYG, Html, Number, Boolean, Select, Date, DateTime, Slug, Media, Relationship, Repeater
 - **Vue 3 + Vite Admin** - Modern, fast admin interface with hot module reloading
 - **SQLite Database** - No MySQL required, perfect for shared hosting
-- **Zero External Dependencies** - Custom JWT auth, no composer packages
+- **Zero External Dependencies** - Custom session-based auth, no composer packages
 - **RESTful API** - Auto-generated endpoints for all content types
 
 ## Requirements
@@ -23,7 +23,7 @@ A lightweight, ACF-style headless CMS built for shared hosting environments.
 ### 1. Install Dependencies
 
 ```bash
-cd _edit/admin
+cd _edit/admin-source
 npm install
 ```
 
@@ -37,7 +37,7 @@ php -S localhost:8000 router.php
 
 **Terminal 2 - Vue Admin:**
 ```bash
-cd _edit/admin
+cd _edit/admin-source
 npm run dev
 ```
 
@@ -52,40 +52,51 @@ On first run, you'll be prompted to create an admin account.
 ```
 scms/
 ├── _edit/
-│   ├── admin/           # Vue 3 + Vite admin interface
+│   ├── admin/           # PHP backend (system files)
+│   │   ├── core/       # Core PHP classes
+│   │   │   ├── Auth/        # Session-based authentication
+│   │   │   ├── Database/    # SQLite wrapper & query builder
+│   │   │   ├── ContentTypes/# Content type registry & CRUD
+│   │   │   ├── Fields/      # 13 field type classes
+│   │   │   ├── Email/       # SMTP email system
+│   │   │   └── Security/    # Security utilities
+│   │   ├── api/
+│   │   │   ├── index.php    # REST API router
+│   │   │   ├── routes/      # Individual route handlers
+│   │   │   └── helpers.php  # Helper functions
+│   │   └── dist/        # Built Vue frontend (generated)
+│   ├── admin-source/    # Vue 3 source (dev only)
 │   │   ├── src/
-│   │   │   ├── composables/   # useApi, useAuth
-│   │   │   └── views/         # PostTypes, FieldGroups, Content, Media
-│   │   └── vite.config.js
-│   ├── api/
-│   │   └── index.php    # REST API router
-│   ├── core/
-│   │   ├── Auth/        # JWT authentication
-│   │   ├── Database/    # SQLite wrapper & seeder
-│   │   ├── PostTypes/   # Post type manager
-│   │   ├── FieldGroups/ # Field group manager
-│   │   ├── Fields/      # 12 field type classes
-│   │   └── ContentTypes/# Content CRUD logic
-│   ├── config/
-│   │   └── jwt-secret.txt
-│   ├── database/
-│   │   └── site.sqlite
-│   └── uploads/
+│   │   │   ├── composables/ # useApi, useAuth
+│   │   │   ├── views/       # Admin views
+│   │   │   └── components/  # Vue components
+│   │   ├── vite.config.js
+│   │   └── package.json
+│   ├── data/            # User data (persistent)
+│   │   ├── config/      # Modular JSON config files
+│   │   │   ├── modules/     # Post types + field groups
+│   │   │   ├── field-groups/# Shared field groups
+│   │   │   └── blocks/      # Content blocks
+│   │   └── database/
+│   │       └── site.sqlite
+│   ├── config/          # System config (generated)
+│   │   └── config.php   # Auto-generated on first run
+│   └── uploads/         # Media files
 └── router.php           # PHP dev server router
 ```
 
 ## Building for Production
 
 ```bash
-cd _edit/admin
+cd _edit/admin-source
 npm run build
 ```
 
-Built files will be in `_edit/admin-dist/`. Deploy the entire `_edit/` directory to your server.
+Built files will be in `_edit/admin/dist/`. Deploy the entire `_edit/` directory to your server.
 
 ## API Usage
 
-All endpoints require JWT authentication (except initial registration).
+All endpoints require session-based authentication (except initial registration).
 
 ### Authentication
 
@@ -167,7 +178,7 @@ POST /_edit/api/product
 - **Backend:** PHP 8.1+ with custom autoloader (PSR-4)
 - **Frontend:** Vue 3 Composition API with Vite
 - **Database:** SQLite with custom query builder
-- **Auth:** Custom JWT implementation (no libraries)
+- **Auth:** Custom session-based authentication (no libraries)
 
 ## License
 

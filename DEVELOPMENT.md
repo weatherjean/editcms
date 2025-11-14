@@ -108,15 +108,15 @@ This will:
 
 **Key Components:**
 - `Database/` - Custom SQLite wrapper
-- `Auth/` - Custom JWT authentication
+- `Auth/` - Custom session-based authentication
 - `ContentTypes/` - Dynamic content type system
-- `Fields/` - 12 field types (Text, Textarea, Wysiwyg, etc.)
+- `Fields/` - 13 field types (Text, Textarea, Wysiwyg, Html, Number, Boolean, Select, Date, Datetime, Slug, Media, Relationship, Repeater)
 - `Email/` - Custom SMTP implementation
 
 **API Routing:**
 - Single file: `_edit/admin/api/index.php`
 - Pattern-based routing
-- JWT authentication on all endpoints (except auth and public email)
+- Session-based authentication on all endpoints (except auth and public email)
 
 ### Frontend (Vue 3)
 
@@ -168,7 +168,7 @@ This is why the directory structure separates:
 This project has ZERO external PHP dependencies:
 - No Composer
 - No packages
-- Custom JWT, SMTP, routing, everything
+- Custom session auth, SMTP, routing, everything
 
 **Why?** Works on any shared hosting without modification.
 
@@ -187,10 +187,11 @@ Content uses EAV (Entity-Attribute-Value) pattern:
 
 ### Authentication
 
-Custom JWT with secret stored in database:
-- Auto-generated on first run
-- No file-based secrets
-- 1 hour token expiration
+Custom session-based authentication with tokens stored in database:
+- Cryptographically secure tokens generated with `random_bytes(32)`
+- Tokens stored in `sessions` table with expiration
+- 24 hour session expiration by default
+- No external libraries or file-based secrets
 
 ### Email System
 
@@ -265,7 +266,7 @@ Edit `_edit/admin/core/Database/Database.php`:
 - Registration locked after first user
 
 **API Authentication:**
-- All endpoints require JWT except:
+- All endpoints require session token except:
   - `/auth/login`
   - `/auth/register` (only if no users exist)
   - `/send-email` (requires single-use token)
