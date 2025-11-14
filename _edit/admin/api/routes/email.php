@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Edit\Core\Database\Database;
 use Edit\Core\Email\Email;
+use Edit\Core\Security\Security;
 
 /**
  * Public email routes (no auth required)
@@ -56,6 +57,11 @@ function handlePublicEmailRoutes(string $method, string $path, Database $db): bo
         // Validate token
         requireFields($data, ['token']);
 
+        // Validate email address
+        if (!Security::validateEmail($data['to'])) {
+            sendError('Invalid email address', 400);
+        }
+
         // Check token exists and is not expired
         $tokenCheck = $db->table('email_tokens')
             ->select(['expires_at'])
@@ -105,14 +111,17 @@ function handlePublicEmailRoutes(string $method, string $path, Database $db): bo
         // Create email instance with SMTP config
         $email = new Email($emailConfig['from_email'], $emailConfig['from_name'], $smtpConfig);
 
-        // Allow overriding from address (if provided)
-        if (isset($data['from_email'])) {
-            $email->setFrom($data['from_email'], $data['from_name'] ?? '');
+        // Determine if HTML and sanitize if needed
+        $isHtml = $data['is_html'] ?? true;
+        $message = $data['message'];
+
+        // Sanitize HTML content to prevent XSS
+        if ($isHtml) {
+            $message = Security::sanitizeHTML($message);
         }
 
-        // Send email
-        $isHtml = $data['is_html'] ?? true;
-        $success = $email->send($data['to'], $data['subject'], $data['message'], $isHtml);
+        // Send email (from address is always from settings, not user-controlled)
+        $success = $email->send($data['to'], $data['subject'], $message, $isHtml);
 
         // Get IP address for logging
         $ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
@@ -186,7 +195,7 @@ function handleEmailAdminRoutes(string $method, string $path, Database $db): boo
         requireFields($data, ['from_email', 'from_name', 'smtp_host', 'smtp_port', 'smtp_username', 'smtp_password']);
 
         // Validate email
-        if (!filter_var($data['from_email'], FILTER_VALIDATE_EMAIL)) {
+        if (!Security::validateEmail($data['from_email'])) {
             sendError('Invalid from_email address', 400);
         }
 

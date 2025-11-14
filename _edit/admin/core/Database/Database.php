@@ -23,10 +23,10 @@ class Database
     private function connect(): void
     {
         try {
-            // Ensure directory exists
+            // Ensure directory exists with secure permissions
             $dir = dirname($this->dbPath);
             if (!is_dir($dir)) {
-                mkdir($dir, 0755, true);
+                mkdir($dir, 0750, true);
             }
 
             $this->pdo = new PDO(
@@ -148,6 +148,29 @@ class Database
             $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_ip_endpoint ON rate_limits(ip_address, endpoint)");
             $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_window ON rate_limits(window_start)");
         }
+
+        // Check if sessions table exists
+        $sessionsCheck = $this->query(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'"
+        );
+
+        if (empty($sessionsCheck)) {
+            // Create sessions table for session-based authentication
+            $this->execute("
+                CREATE TABLE IF NOT EXISTS sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    token TEXT UNIQUE NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    expires_at DATETIME NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            ");
+
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)");
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)");
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)");
+        }
     }
 
     private function createSchema(): void
@@ -268,6 +291,22 @@ class Database
             $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_ip_endpoint ON rate_limits(ip_address, endpoint)");
             $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_window ON rate_limits(window_start)");
 
+            // Sessions table - for session-based authentication
+            $this->execute("
+                CREATE TABLE IF NOT EXISTS sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    token TEXT UNIQUE NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    expires_at DATETIME NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            ");
+
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)");
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)");
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)");
+
             $this->commit();
         } catch (PDOException $e) {
             $this->rollback();
@@ -357,6 +396,21 @@ class Database
         } catch (\Exception $e) {
             // Silently fail - this is a cleanup operation, not critical
             // Log if you have logging system
+        }
+    }
+
+    /**
+     * Clean up expired sessions
+     * This is called opportunistically during auth operations
+     */
+    public function cleanupExpiredSessions(): void
+    {
+        try {
+            $this->execute(
+                "DELETE FROM sessions WHERE expires_at < datetime('now')"
+            );
+        } catch (\Exception $e) {
+            // Silently fail - this is a cleanup operation, not critical
         }
     }
 

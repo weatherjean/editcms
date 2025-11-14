@@ -5,17 +5,16 @@ declare(strict_types=1);
 namespace Edit\Core\Auth;
 
 use Edit\Core\Database\Database;
+use Edit\Core\Security\Security;
 
 class Auth
 {
     private Database $db;
-    private JWT $jwt;
     private ?int $currentUserId = null;
 
-    public function __construct(Database $db, ?JWT $jwt = null)
+    public function __construct(Database $db)
     {
         $this->db = $db;
-        $this->jwt = $jwt ?? new JWT(null, $db);
     }
 
     /**
@@ -24,8 +23,14 @@ class Auth
     public function register(string $email, string $password, string $name): int
     {
         // Validate email
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        if (!Security::validateEmail($email)) {
             throw new \RuntimeException("Invalid email address");
+        }
+
+        // Validate password strength
+        $passwordValidation = Security::validatePassword($password);
+        if (!$passwordValidation['valid']) {
+            throw new \RuntimeException($passwordValidation['error']);
         }
 
         // Check if email already exists
@@ -46,10 +51,13 @@ class Auth
     }
 
     /**
-     * Login user and return user data with token
+     * Login user and return user data with session token
      */
     public function login(string $email, string $password): ?array
     {
+        // Cleanup expired sessions opportunistically
+        $this->db->cleanupExpiredSessions();
+
         // Find user by email
         $user = $this->db->table('users')->where('email', $email)->first();
 
@@ -62,11 +70,16 @@ class Auth
             return null;
         }
 
-        // Generate token
-        $token = $this->jwt->encode([
+        // Generate cryptographically secure token
+        $token = bin2hex(random_bytes(32));
+        $expiresAt = date('Y-m-d H:i:s', time() + (EDIT_SESSION_EXPIRY_HOURS * 3600));
+
+        // Store session in database
+        $this->db->table('sessions')->insert([
+            'token' => $token,
             'user_id' => $user['id'],
-            'email' => $user['email']
-        ], 86400); // 24 hours
+            'expires_at' => $expiresAt
+        ]);
 
         // Return user data without password
         unset($user['password']);
@@ -89,13 +102,23 @@ class Auth
         // Remove "Bearer " prefix if present
         $token = preg_replace('/^Bearer\s+/', '', $token);
 
-        $payload = $this->jwt->decode($token);
+        // Look up session in database
+        $session = $this->db->table('sessions')
+            ->where('token', $token)
+            ->first();
 
-        if (!$payload || !isset($payload['user_id'])) {
+        if (!$session) {
+            return null; // Session not found
+        }
+
+        // Check if session has expired
+        if (strtotime($session['expires_at']) < time()) {
+            // Clean up expired session
+            $this->db->table('sessions')->where('id', $session['id'])->delete();
             return null;
         }
 
-        $this->currentUserId = (int) $payload['user_id'];
+        $this->currentUserId = (int) $session['user_id'];
         return $this->currentUserId;
     }
 
@@ -135,6 +158,36 @@ class Auth
     public function setCurrentUser(int $userId): void
     {
         $this->currentUserId = $userId;
+    }
+
+    /**
+     * Logout user by removing their session
+     */
+    public function logout(string $token): bool
+    {
+        if (empty($token)) {
+            return false;
+        }
+
+        // Remove "Bearer " prefix if present
+        $token = preg_replace('/^Bearer\s+/', '', $token);
+
+        // Delete session from database
+        $deleted = $this->db->table('sessions')
+            ->where('token', $token)
+            ->delete();
+
+        return $deleted > 0;
+    }
+
+    /**
+     * Logout all sessions for a user
+     */
+    public function logoutAll(int $userId): int
+    {
+        return $this->db->table('sessions')
+            ->where('user_id', $userId)
+            ->delete();
     }
 
     /**

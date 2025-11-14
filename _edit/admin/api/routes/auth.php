@@ -78,5 +78,22 @@ function handleAuthRoutes(string $method, string $path, Auth $auth, Database $db
         return true;
     }
 
+    // Logout (requires auth)
+    if ($path === '/auth/logout' && $method === 'POST') {
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+
+        if (empty($authHeader)) {
+            $authHeader = apache_request_headers()['Authorization'] ?? '';
+        }
+
+        if (empty($authHeader)) {
+            sendError('No token provided', 400);
+        }
+
+        $success = $auth->logout($authHeader);
+        sendJson(['success' => $success, 'message' => $success ? 'Logged out successfully' : 'Session not found']);
+        return true;
+    }
+
     return false;
 }

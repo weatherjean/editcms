@@ -10,6 +10,19 @@ declare(strict_types=1);
 // Define base path - points to _edit/ root (parent of admin/)
 define('EDIT_BASE_PATH', dirname(__DIR__, 2));
 
+// Load configuration
+$configFile = EDIT_BASE_PATH . '/config.php';
+if (file_exists($configFile)) {
+    require_once $configFile;
+} else {
+    // Set defaults if config doesn't exist
+    define('EDIT_ENCRYPTION_KEY', 'default-insecure-key-change-in-production');
+    define('EDIT_CORS_ORIGINS', ['http://localhost:5173']);
+    define('EDIT_DATABASE_PATH', EDIT_BASE_PATH . '/data/database/site.sqlite');
+    define('EDIT_DEBUG', false);
+    define('EDIT_SESSION_EXPIRY_HOURS', 24);
+}
+
 // Simple PSR-4 autoloader
 spl_autoload_register(function ($class) {
     // Namespace mappings

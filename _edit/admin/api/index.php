@@ -10,12 +10,21 @@ use Edit\Core\Database\Database;
 use Edit\Core\Auth\Auth;
 use Edit\Core\ContentTypes\ContentTypeRegistry;
 use Edit\Core\ContentTypes\BlockRegistry;
+use Edit\Core\Security\Security;
 
-// Handle CORS - Allow requests from Vite dev server
-header('Access-Control-Allow-Origin: http://localhost:5173');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
-header('Access-Control-Allow-Credentials: true');
+// Handle CORS
+// In production, the Vue app is served from same origin, so CORS isn't needed
+// In development, we allow configured origins (from config.php)
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if (in_array($origin, EDIT_CORS_ORIGINS)) {
+    header("Access-Control-Allow-Origin: {$origin}");
+    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization');
+    header('Access-Control-Allow-Credentials: true');
+}
+
+// Add security headers
+Security::addSecurityHeaders();
 
 // Handle preflight requests
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -24,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // Initialize services
-$db = new Database(EDIT_BASE_PATH . '/data/database/site.sqlite');
+$db = new Database(EDIT_DATABASE_PATH);
 $auth = new Auth($db);
 $registry = new ContentTypeRegistry();
 $registry->load();

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Edit\Core\Database\Database;
+use Edit\Core\Security\Security;
 
 /**
  * Media management routes (requires auth)
@@ -23,7 +24,7 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
 
         $file = $_FILES['file'];
 
-        // Validate file
+        // Check upload error first
         if ($file['error'] !== UPLOAD_ERR_OK) {
             $errorMessages = [
                 UPLOAD_ERR_INI_SIZE => 'File exceeds upload_max_filesize',
@@ -38,10 +39,16 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
             sendError($errorMsg, 400);
         }
 
-        // Create upload directory structure
+        // Validate file security (MIME type, size, content)
+        $validation = Security::validateUpload($file);
+        if (!$validation['valid']) {
+            sendError($validation['error'], 400);
+        }
+
+        // Create upload directory structure with secure permissions
         $uploadDir = EDIT_BASE_PATH . '/uploads/' . date('Y/m');
         if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
+            mkdir($uploadDir, 0750, true);
         }
 
         // Generate unique filename
@@ -54,12 +61,12 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
             sendError('Failed to save file', 500);
         }
 
-        // Save to database
+        // Save to database (use validated MIME type, not user-provided)
         $relativePath = date('Y/m') . '/' . $filename;
         $mediaId = $db->table('media')->insert([
             'filename' => $file['name'],
             'path' => $relativePath,
-            'mime_type' => $file['type'],
+            'mime_type' => $validation['mime'], // Use validated MIME type
             'size' => $file['size']
         ]);
 
@@ -93,6 +100,15 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
         }
 
         if ($method === 'DELETE' && $mediaId) {
+            // Check if media is in use before deleting
+            $usage = $db->table('content_meta')
+                ->where('meta_value', (string)$mediaId)
+                ->first();
+
+            if ($usage) {
+                sendError('Media is currently in use and cannot be deleted', 400);
+            }
+
             // Delete media file and database record
             $media = $db->table('media')->where('id', $mediaId)->first();
             if ($media) {

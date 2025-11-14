@@ -16,6 +16,9 @@ _edit/data/database/*.sqlite-shm
 _edit/uploads/*
 !_edit/uploads/.gitkeep
 
+# Configuration (contains secrets)
+_edit/config.php
+
 # Logs
 *.log
 server.log

@@ -53,6 +53,16 @@ if (is_dir($file_path)) {
 
 // If file exists, serve it
 if (file_exists($file_path) && is_file($file_path)) {
+    // Security: Verify the resolved path is still within _edit directory
+    $realPath = realpath($file_path);
+    $basePath = realpath(__DIR__ . '/_edit');
+
+    if ($realPath === false || strpos($realPath, $basePath) !== 0) {
+        http_response_code(403);
+        echo "403 Forbidden - Invalid path";
+        exit;
+    }
+
     // For PHP files, execute them
     if (pathinfo($file_path, PATHINFO_EXTENSION) === 'php') {
         require $file_path;

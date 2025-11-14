@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Edit\Core\Database\Database;
 use Edit\Core\Auth\Auth;
+use Edit\Core\Security\Security;
 
 /**
  * User management routes (requires auth)
@@ -37,7 +38,7 @@ function handleUserRoutes(string $method, string $path, Database $db, Auth $auth
                 ->select(['id', 'name', 'email', 'created_at'])
                 ->where('id', $newUserId)
                 ->first();
-            sendJson($newUser[0]);
+            sendJson($newUser);
         } catch (\Exception $e) {
             sendError($e->getMessage(), 400);
         }
@@ -50,6 +51,12 @@ function handleUserRoutes(string $method, string $path, Database $db, Auth $auth
         $data = getJsonBody();
 
         requireFields($data, ['password']);
+
+        // Validate password strength
+        $passwordValidation = Security::validatePassword($data['password']);
+        if (!$passwordValidation['valid']) {
+            sendError($passwordValidation['error'], 400);
+        }
 
         $passwordHash = password_hash($data['password'], PASSWORD_DEFAULT);
         $db->table('users')

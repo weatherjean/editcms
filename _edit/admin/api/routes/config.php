@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Edit\Core\ContentTypes\ContentTypeRegistry;
 use Edit\Core\ContentTypes\BlockRegistry;
+use Edit\Core\Security\Security;
 
 /**
  * Helper function to validate JSON structure
@@ -172,10 +173,10 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
             sendError($error, 400);
         }
 
-        // Save file
+        // Save file with secure permissions
         $targetPath = EDIT_BASE_PATH . "/data/config/{$type}";
         if (!is_dir($targetPath)) {
-            mkdir($targetPath, 0755, true);
+            mkdir($targetPath, 0750, true);
         }
 
         $targetFile = $targetPath . '/' . basename($file['name']);
@@ -273,6 +274,12 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
         // Validate file is a ZIP
         if (!str_ends_with($file['name'], '.zip')) {
             sendError('File must be a ZIP archive', 400);
+        }
+
+        // Validate ZIP security (prevent zip bombs)
+        $zipValidation = Security::validateZIP($file['tmp_name']);
+        if (!$zipValidation['valid']) {
+            sendError($zipValidation['error'], 400);
         }
 
         $zip = new ZipArchive();
