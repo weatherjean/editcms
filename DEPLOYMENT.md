@@ -89,6 +89,36 @@ The `uploads/` directory isn't writable. Using cPanel File Manager:
 2. Right-click → Change Permissions
 3. Set to **755** (rwxr-xr-x)
 
+### Upload File Size Limits
+By default, _edit supports uploads up to **50MB** (configured in `.user.ini`).
+
+**If you get "file too large" errors:**
+
+Most shared hosting automatically reads the `.user.ini` file, but if not:
+
+**cPanel/Plesk**: Look for "PHP Options" or "Select PHP Version" in your control panel and adjust:
+- `upload_max_filesize` → 50M (or higher)
+- `post_max_size` → 50M (or higher)
+
+**VPS/Dedicated Server**: Edit your `php.ini`:
+```ini
+upload_max_filesize = 50M
+post_max_size = 50M
+memory_limit = 256M
+```
+
+**Nginx Users**: Also add to your server block:
+```nginx
+client_max_body_size 50M;
+```
+
+**To change the application limit**, edit `_edit/admin/core/Security/Security.php`:
+```php
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+```
+
+**Important:** `MAX_FILE_SIZE` must be ≤ `upload_max_filesize` ≤ `post_max_size`
+
 ### Registration Says "Disabled"
 A user already exists. Log in with the existing account and create more users via the Users page.
 

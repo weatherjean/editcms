@@ -34,13 +34,6 @@ class Security
         'audio/wav',
     ];
 
-    // Maximum file size in bytes (10MB default)
-    private const MAX_FILE_SIZE = 10 * 1024 * 1024;
-
-    // Maximum image dimensions
-    private const MAX_IMAGE_WIDTH = 4000;
-    private const MAX_IMAGE_HEIGHT = 4000;
-
     /**
      * Validate uploaded file
      *
@@ -50,7 +43,7 @@ class Security
      */
     public static function validateUpload(array $file, ?int $maxSize = null): array
     {
-        $maxSize = $maxSize ?? self::MAX_FILE_SIZE;
+        $maxSize = $maxSize ?? EDIT_MAX_FILE_SIZE;
 
         // Check file was uploaded
         if (!isset($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
@@ -110,10 +103,10 @@ class Security
         [$width, $height] = $imageInfo;
 
         // Check dimensions
-        if ($width > self::MAX_IMAGE_WIDTH || $height > self::MAX_IMAGE_HEIGHT) {
+        if ($width > EDIT_MAX_IMAGE_WIDTH || $height > EDIT_MAX_IMAGE_HEIGHT) {
             return [
                 'valid' => false,
-                'error' => 'Image dimensions too large (max ' . self::MAX_IMAGE_WIDTH . 'x' . self::MAX_IMAGE_HEIGHT . ')',
+                'error' => 'Image dimensions too large (max ' . EDIT_MAX_IMAGE_WIDTH . 'x' . EDIT_MAX_IMAGE_HEIGHT . ')',
                 'mime' => $mimeType
             ];
         }
@@ -327,10 +320,13 @@ class Security
      */
     public static function validateZIP(
         string $zipPath,
-        int $maxCompressedSize = 10485760, // 10MB
-        int $maxUncompressedSize = 52428800, // 50MB
-        int $maxFiles = 1000
+        ?int $maxCompressedSize = null,
+        ?int $maxUncompressedSize = null,
+        ?int $maxFiles = null
     ): array {
+        $maxCompressedSize = $maxCompressedSize ?? EDIT_MAX_ZIP_COMPRESSED_SIZE;
+        $maxUncompressedSize = $maxUncompressedSize ?? EDIT_MAX_ZIP_UNCOMPRESSED_SIZE;
+        $maxFiles = $maxFiles ?? EDIT_MAX_ZIP_FILES;
         // Check compressed file size
         $compressedSize = filesize($zipPath);
         if ($compressedSize > $maxCompressedSize) {
@@ -460,5 +456,16 @@ class Security
         $decrypted = openssl_decrypt($ciphertext, $cipher, $key, OPENSSL_RAW_DATA, $iv, $tag);
 
         return $decrypted !== false ? $decrypted : null;
+    }
+
+    /**
+     * Generate a cryptographically secure random token
+     *
+     * @param int $length Number of random bytes to generate (default: 32)
+     * @return string Hex-encoded token string (length * 2 characters)
+     */
+    public static function generateToken(int $length = 32): string
+    {
+        return bin2hex(random_bytes($length));
     }
 }

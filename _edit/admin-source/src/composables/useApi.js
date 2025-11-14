@@ -9,12 +9,15 @@ export function useApi() {
     error.value = null
 
     const token = localStorage.getItem('edit_token')
-    const headers = {
-      'Content-Type': 'application/json'
-    }
+    const headers = {}
 
     if (token) {
       headers['Authorization'] = `Bearer ${token}`
+    }
+
+    const isFormData = data instanceof FormData
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json'
     }
 
     const options = {
@@ -23,23 +26,20 @@ export function useApi() {
     }
 
     if (data && (method === 'POST' || method === 'PUT')) {
-      options.body = JSON.stringify(data)
+      options.body = isFormData ? data : JSON.stringify(data)
     }
 
     try {
       const response = await fetch(`/_edit/api${endpoint}`, options)
 
       if (!response.ok) {
-        // Parse error response
         const errorData = await response.json().catch(() => ({ error: null }))
 
-        // Provide specific error messages based on status code
         let errorMessage = errorData.error
         if (!errorMessage) {
           switch (response.status) {
             case 401:
               errorMessage = 'Session expired. Please log in again.'
-              // Clear auth token on 401
               localStorage.removeItem('edit_token')
               break
             case 403:

@@ -18,12 +18,10 @@ use Edit\Core\ContentTypes\ContentType;
  */
 function handleContentRoutes(string $method, string $path, Database $db, ContentTypeRegistry $registry, int $userId): bool
 {
-    // Match dynamic content type routes
     if (preg_match('#^/([a-z_-]+)(/(\d+))?$#', $path, $matches)) {
         $type = $matches[1];
         $id = isset($matches[3]) ? (int) $matches[3] : null;
 
-        // Skip reserved routes
         $reserved = [
             'auth', 'users', 'media', 'config', 'email-settings',
             'email-logs', 'send-email', 'post-types', 'field-groups',
@@ -34,26 +32,22 @@ function handleContentRoutes(string $method, string $path, Database $db, Content
             return false;
         }
 
-        // Check if content type exists
         if (!$registry->exists($type)) {
             sendError("Content type '{$type}' not found", 404);
         }
 
         $contentType = new ContentType($db, $type, $registry->get($type));
 
-        // Handle different HTTP methods
         try {
             switch ($method) {
                 case 'GET':
                     if ($id) {
-                        // Get single item
                         $result = $contentType->find($id);
                         if (!$result) {
                             sendError('Content not found', 404);
                         }
                         sendJson($result);
                     } else {
-                        // Get all items
                         $filters = [];
                         if (isset($_GET['status'])) {
                             $filters['status'] = $_GET['status'];
@@ -71,13 +65,11 @@ function handleContentRoutes(string $method, string $path, Database $db, Content
                     break;
 
                 case 'POST':
-                    // Create new item
                     $data = getJsonBody();
                     if (!$data) {
                         sendError('Invalid JSON data', 400);
                     }
 
-                    // Set author to current user
                     $data['author_id'] = $userId;
 
                     $newId = $contentType->create($data);
@@ -86,7 +78,6 @@ function handleContentRoutes(string $method, string $path, Database $db, Content
                     break;
 
                 case 'PUT':
-                    // Update item
                     if (!$id) {
                         sendError('ID required for update', 400);
                     }
@@ -102,7 +93,6 @@ function handleContentRoutes(string $method, string $path, Database $db, Content
                     break;
 
                 case 'DELETE':
-                    // Delete item
                     if (!$id) {
                         sendError('ID required for delete', 400);
                     }

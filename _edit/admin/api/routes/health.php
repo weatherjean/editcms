@@ -13,25 +13,21 @@ use Edit\Core\Database\Database;
  */
 function handleHealthRoutes(string $method, string $path, Database $db): bool
 {
-    // Check if any users exist (for first-time setup detection)
     if ($path === '/auth/has-users' && $method === 'GET') {
         $count = $db->table('users')->count();
         sendJson(['has_users' => $count > 0]);
         return true;
     }
 
-    // System health check
     if ($path === '/health' && $method === 'GET') {
         $checks = [];
 
-        // PHP version
         $checks['php_version'] = [
             'value' => PHP_VERSION,
             'status' => version_compare(PHP_VERSION, '8.1.0', '>=') ? 'ok' : 'error',
             'message' => version_compare(PHP_VERSION, '8.1.0', '>=') ? 'PHP 8.1+ ✓' : 'PHP 8.1+ required'
         ];
 
-        // Required extensions
         $requiredExtensions = ['sqlite3', 'pdo', 'json', 'fileinfo'];
         $missingExtensions = [];
         foreach ($requiredExtensions as $ext) {
@@ -45,7 +41,6 @@ function handleHealthRoutes(string $method, string $path, Database $db): bool
             'message' => empty($missingExtensions) ? 'All required extensions loaded ✓' : 'Missing: ' . implode(', ', $missingExtensions)
         ];
 
-        // Database writable
         $dbDir = EDIT_BASE_PATH . '/data/database';
         $checks['database_writable'] = [
             'value' => is_writable($dbDir),
@@ -53,7 +48,6 @@ function handleHealthRoutes(string $method, string $path, Database $db): bool
             'message' => is_writable($dbDir) ? 'Database directory writable ✓' : 'Database directory not writable (may cause issues)'
         ];
 
-        // Uploads writable
         $uploadsDir = EDIT_BASE_PATH . '/uploads';
         $checks['uploads_writable'] = [
             'value' => is_writable($uploadsDir),
@@ -61,7 +55,6 @@ function handleHealthRoutes(string $method, string $path, Database $db): bool
             'message' => is_writable($uploadsDir) ? 'Uploads directory writable ✓' : 'Uploads directory not writable (media uploads will fail)'
         ];
 
-        // Config writable
         $configDir = EDIT_BASE_PATH . '/data/config';
         $checks['config_writable'] = [
             'value' => is_writable($configDir),
@@ -69,7 +62,6 @@ function handleHealthRoutes(string $method, string $path, Database $db): bool
             'message' => is_writable($configDir) ? 'Config directory writable ✓' : 'Config directory not writable (can\'t save post types)'
         ];
 
-        // Overall status
         $hasErrors = false;
         $hasWarnings = false;
         foreach ($checks as $check) {
@@ -79,7 +71,6 @@ function handleHealthRoutes(string $method, string $path, Database $db): bool
 
         $overall = $hasErrors ? 'error' : ($hasWarnings ? 'warning' : 'ok');
 
-        // Check if this is first-time setup (no users exist)
         $userCount = $db->table('users')->count();
 
         sendJson([

@@ -16,7 +16,6 @@ use Edit\Core\Security\Security;
  */
 function handleMediaRoutes(string $method, string $path, Database $db, int $userId): bool
 {
-    // Upload media
     if ($path === '/media' && $method === 'POST') {
         if (!isset($_FILES['file'])) {
             sendError('No file uploaded', 400);
@@ -24,7 +23,6 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
 
         $file = $_FILES['file'];
 
-        // Check upload error first
         if ($file['error'] !== UPLOAD_ERR_OK) {
             $errorMessages = [
                 UPLOAD_ERR_INI_SIZE => 'File exceeds upload_max_filesize',
@@ -39,34 +37,29 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
             sendError($errorMsg, 400);
         }
 
-        // Validate file security (MIME type, size, content)
         $validation = Security::validateUpload($file);
         if (!$validation['valid']) {
             sendError($validation['error'], 400);
         }
 
-        // Create upload directory structure with secure permissions
         $uploadDir = EDIT_BASE_PATH . '/uploads/' . date('Y/m');
         if (!is_dir($uploadDir)) {
             mkdir($uploadDir, 0750, true);
         }
 
-        // Generate unique filename
         $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
         $filename = uniqid() . '.' . $extension;
         $uploadPath = $uploadDir . '/' . $filename;
 
-        // Move uploaded file
         if (!move_uploaded_file($file['tmp_name'], $uploadPath)) {
             sendError('Failed to save file', 500);
         }
 
-        // Save to database (use validated MIME type, not user-provided)
         $relativePath = date('Y/m') . '/' . $filename;
         $mediaId = $db->table('media')->insert([
             'filename' => $file['name'],
             'path' => $relativePath,
-            'mime_type' => $validation['mime'], // Use validated MIME type
+            'mime_type' => $validation['mime'],
             'size' => $file['size']
         ]);
 
@@ -77,13 +70,11 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
         return true;
     }
 
-    // Media list/get/delete endpoints
     if (preg_match('#^/media(/(\d+))?$#', $path, $mediaMatches)) {
         $mediaId = $mediaMatches[2] ?? null;
 
         if ($method === 'GET') {
             if ($mediaId) {
-                // Get single media
                 $media = $db->table('media')->where('id', $mediaId)->first();
                 if (!$media) {
                     sendError('Media not found', 404);
@@ -91,7 +82,6 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
                 $media = addMediaUrl($media);
                 sendJson($media);
             } else {
-                // List all media
                 $media = $db->table('media')->orderBy('created_at', 'DESC')->get();
                 $media = addMediaUrl($media);
                 sendJson($media);
@@ -100,12 +90,10 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
         }
 
         if ($method === 'DELETE' && $mediaId) {
-            // Check if media is in use before deleting (handles JSON fields too)
             if (checkMediaUsage($db, $mediaId)) {
                 sendError('Media is currently in use and cannot be deleted', 409);
             }
 
-            // Delete media file and database record
             $media = $db->table('media')->where('id', $mediaId)->first();
             if ($media) {
                 $filePath = EDIT_BASE_PATH . '/uploads/' . $media['path'];

@@ -15,7 +15,6 @@ use Edit\Core\Auth\Auth;
  */
 function handleAuthRoutes(string $method, string $path, Auth $auth, Database $db): bool
 {
-    // Login
     if ($path === '/auth/login') {
         requireMethod($method, 'POST');
 
@@ -34,7 +33,6 @@ function handleAuthRoutes(string $method, string $path, Auth $auth, Database $db
         return true;
     }
 
-    // Register (first-time setup only)
     if ($path === '/auth/register') {
         requireMethod($method, 'POST');
 
@@ -53,7 +51,6 @@ function handleAuthRoutes(string $method, string $path, Auth $auth, Database $db
         try {
             $userId = $auth->register($data['email'], $data['password'], $data['name']);
 
-            // Auto-login after registration
             $result = $auth->login($data['email'], $data['password']);
             sendJson($result);
         } catch (\Exception $e) {
@@ -62,7 +59,6 @@ function handleAuthRoutes(string $method, string $path, Auth $auth, Database $db
         return true;
     }
 
-    // Logout (requires auth)
     if ($path === '/auth/logout' && $method === 'POST') {
         $authHeader = getAuthHeader();
 

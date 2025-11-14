@@ -316,14 +316,12 @@ async function sendTestEmail() {
   sending.value = true
 
   try {
-    // Step 1: Get a token
     const tokenResponse = await fetch('/_edit/api/send-email/token')
     if (!tokenResponse.ok) {
       throw new Error('Failed to get email token')
     }
     const tokenData = await tokenResponse.json()
 
-    // Step 2: Send email with token
     const response = await fetch('/_edit/api/send-email', {
       method: 'POST',
       headers: {
@@ -345,7 +343,6 @@ async function sendTestEmail() {
     messageType.value = 'success'
     closeTestEmailDialog()
 
-    // Reload logs to show the new send
     loadLogs()
   } catch (error) {
     message.value = error.message || 'Failed to send test email'

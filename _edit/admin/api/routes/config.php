@@ -57,79 +57,35 @@ function validateConfigJson(string $json, string $type): ?string {
  */
 function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $registry, BlockRegistry $blocks): bool
 {
-    // Get all active post types (for sidebar)
     if ($path === '/post-types' && $method === 'GET') {
         $postTypes = $registry->getPostTypes();
         sendJson($postTypes);
         return true;
     }
 
-    // Get all active field groups
     if ($path === '/field-groups' && $method === 'GET') {
         $fieldGroups = $registry->getFieldGroups();
         sendJson($fieldGroups);
         return true;
     }
 
-    // Get all blocks (for block editor)
     if ($path === '/blocks' && $method === 'GET') {
         sendJson($blocks->getBlocks());
         return true;
     }
 
-    // List all config files by type
     if ($path === '/config' && $method === 'GET') {
         $configPath = EDIT_BASE_PATH . '/data/config';
         $result = [
-            'modules' => [],
-            'field_groups' => [],
-            'blocks' => []
+            'modules' => listConfigFiles($configPath . '/modules'),
+            'field_groups' => listConfigFiles($configPath . '/field-groups'),
+            'blocks' => listConfigFiles($configPath . '/blocks')
         ];
-
-        // Get modules
-        $modulesPath = $configPath . '/modules';
-        if (is_dir($modulesPath)) {
-            foreach (glob($modulesPath . '/*.json') as $file) {
-                $result['modules'][] = [
-                    'name' => basename($file, '.json'),
-                    'filename' => basename($file),
-                    'size' => filesize($file),
-                    'modified' => filemtime($file)
-                ];
-            }
-        }
-
-        // Get field groups
-        $fieldGroupsPath = $configPath . '/field-groups';
-        if (is_dir($fieldGroupsPath)) {
-            foreach (glob($fieldGroupsPath . '/*.json') as $file) {
-                $result['field_groups'][] = [
-                    'name' => basename($file, '.json'),
-                    'filename' => basename($file),
-                    'size' => filesize($file),
-                    'modified' => filemtime($file)
-                ];
-            }
-        }
-
-        // Get blocks
-        $blocksPath = $configPath . '/blocks';
-        if (is_dir($blocksPath)) {
-            foreach (glob($blocksPath . '/*.json') as $file) {
-                $result['blocks'][] = [
-                    'name' => basename($file, '.json'),
-                    'filename' => basename($file),
-                    'size' => filesize($file),
-                    'modified' => filemtime($file)
-                ];
-            }
-        }
 
         sendJson($result);
         return true;
     }
 
-    // Get specific config file content
     if (preg_match('#^/config/(modules|field-groups|blocks)/([a-z0-9_-]+)$#', $path, $matches) && $method === 'GET') {
         $type = $matches[1];
         $name = $matches[2];
@@ -145,12 +101,10 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
         exit;
     }
 
-    // Upload/Replace config file
     if (preg_match('#^/config/(modules|field-groups|blocks)$#', $path, $matches) && $method === 'POST') {
         $type = $matches[1];
         $typeLabel = str_replace('-', ' ', $type);
 
-        // Get uploaded file
         if (!isset($_FILES['file'])) {
             sendError('No file uploaded', 400);
         }
@@ -160,12 +114,10 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
             sendError('File upload failed', 400);
         }
 
-        // Validate file extension
         if (!str_ends_with($file['name'], '.json')) {
             sendError('File must be a JSON file', 400);
         }
 
-        // Read and validate content
         $content = file_get_contents($file['tmp_name']);
         $validationType = $type === 'field-groups' ? 'field-group' : rtrim($type, 's');
         $error = validateConfigJson($content, $validationType);
@@ -173,7 +125,6 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
             sendError($error, 400);
         }
 
-        // Save file with secure permissions
         $targetPath = EDIT_BASE_PATH . "/data/config/{$type}";
         if (!is_dir($targetPath)) {
             mkdir($targetPath, 0750, true);
@@ -184,7 +135,6 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
             sendError('Failed to save file', 500);
         }
 
-        // Reload configuration
         $registry->reload();
         $blocks->reload();
 
@@ -196,7 +146,6 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
         return true;
     }
 
-    // Delete config file
     if (preg_match('#^/config/(modules|field-groups|blocks)/([a-z0-9_-]+)$#', $path, $matches) && $method === 'DELETE') {
         $type = $matches[1];
         $name = $matches[2];
@@ -210,7 +159,6 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
             sendError('Failed to delete file', 500);
         }
 
-        // Reload configuration
         $registry->reload();
         $blocks->reload();
 
@@ -218,7 +166,6 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
         return true;
     }
 
-    // Export all configuration as ZIP
     if ($path === '/config/export' && $method === 'GET') {
         $configPath = EDIT_BASE_PATH . '/data/config';
         $zipFile = sys_get_temp_dir() . '/edit-config-' . time() . '.zip';
@@ -228,21 +175,18 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
             sendError('Failed to create ZIP archive', 500);
         }
 
-        // Add all modules
         if (is_dir($configPath . '/modules')) {
             foreach (glob($configPath . '/modules/*.json') as $file) {
                 $zip->addFile($file, 'modules/' . basename($file));
             }
         }
 
-        // Add all field groups
         if (is_dir($configPath . '/field-groups')) {
             foreach (glob($configPath . '/field-groups/*.json') as $file) {
                 $zip->addFile($file, 'field-groups/' . basename($file));
             }
         }
 
-        // Add all blocks
         if (is_dir($configPath . '/blocks')) {
             foreach (glob($configPath . '/blocks/*.json') as $file) {
                 $zip->addFile($file, 'blocks/' . basename($file));
@@ -251,7 +195,6 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
 
         $zip->close();
 
-        // Send file
         header('Content-Type: application/zip');
         header('Content-Disposition: attachment; filename="edit-config-' . date('Y-m-d') . '.zip"');
         header('Content-Length: ' . filesize($zipFile));
@@ -260,7 +203,6 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
         exit;
     }
 
-    // Import all configuration from ZIP
     if ($path === '/config/import' && $method === 'POST') {
         if (!isset($_FILES['file'])) {
             sendError('No file uploaded', 400);
@@ -271,12 +213,10 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
             sendError('File upload failed', 400);
         }
 
-        // Validate file is a ZIP
         if (!str_ends_with($file['name'], '.zip')) {
             sendError('File must be a ZIP archive', 400);
         }
 
-        // Validate ZIP security (prevent zip bombs)
         $zipValidation = Security::validateZIP($file['tmp_name']);
         if (!$zipValidation['valid']) {
             sendError($zipValidation['error'], 400);
@@ -289,7 +229,6 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
 
         $configPath = EDIT_BASE_PATH . '/data/config';
 
-        // Create backup before importing
         $backupDir = $configPath . '/backups';
         if (!is_dir($backupDir)) {
             mkdir($backupDir, 0755, true);
@@ -299,21 +238,18 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
         $backupFile = $backupDir . '/' . time() . '.zip';
 
         if ($backupZip->open($backupFile, ZipArchive::CREATE) === true) {
-            // Add all current modules
             if (is_dir($configPath . '/modules')) {
                 foreach (glob($configPath . '/modules/*.json') as $file) {
                     $backupZip->addFile($file, 'modules/' . basename($file));
                 }
             }
 
-            // Add all current field groups
             if (is_dir($configPath . '/field-groups')) {
                 foreach (glob($configPath . '/field-groups/*.json') as $file) {
                     $backupZip->addFile($file, 'field-groups/' . basename($file));
                 }
             }
 
-            // Add all current blocks
             if (is_dir($configPath . '/blocks')) {
                 foreach (glob($configPath . '/blocks/*.json') as $file) {
                     $backupZip->addFile($file, 'blocks/' . basename($file));
@@ -326,23 +262,19 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
         $errors = [];
         $imported = ['modules' => 0, 'field_groups' => 0, 'blocks' => 0];
 
-        // Extract and validate each file
         for ($i = 0; $i < $zip->numFiles; $i++) {
             $filename = $zip->getNameIndex($i);
 
-            // Determine type from path
             if (preg_match('#^(modules|field-groups|blocks)/([^/]+\.json)$#', $filename, $matches)) {
                 $type = $matches[1];
                 $basename = $matches[2];
 
-                // Get file content
                 $content = $zip->getFromIndex($i);
                 if ($content === false) {
                     $errors[] = "Failed to read {$filename}";
                     continue;
                 }
 
-                // Validate JSON
                 $validationType = $type === 'field-groups' ? 'field-group' : rtrim($type, 's');
                 $error = validateConfigJson($content, $validationType);
                 if ($error) {
@@ -350,7 +282,6 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
                     continue;
                 }
 
-                // Save file
                 $targetDir = $configPath . '/' . $type;
                 if (!is_dir($targetDir)) {
                     mkdir($targetDir, 0755, true);
@@ -362,7 +293,6 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
                     continue;
                 }
 
-                // Count successful imports
                 $key = str_replace('-', '_', $type);
                 $imported[$key]++;
             }
@@ -370,7 +300,6 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
 
         $zip->close();
 
-        // Reload configuration
         $registry->reload();
         $blocks->reload();
 

@@ -136,7 +136,6 @@ function addBlock(blockType) {
   const block = getBlock(blockType)
   if (!block) return
 
-  // Initialize fields for the new block
   const fields = {}
   block.fields.forEach(field => {
     if (field.type === 'repeater') {

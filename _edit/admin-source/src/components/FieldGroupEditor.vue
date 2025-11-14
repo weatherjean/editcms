@@ -122,7 +122,6 @@ const isEditing = computed(() => !!originalKey.value)
 
 function open(fieldGroup = null) {
   if (fieldGroup) {
-    // Editing existing field group
     form.value = {
       key: fieldGroup.key,
       title: fieldGroup.title,
@@ -132,7 +131,6 @@ function open(fieldGroup = null) {
     }
     originalKey.value = fieldGroup.key
   } else {
-    // Creating new field group
     form.value = {
       key: '',
       title: '',
@@ -151,13 +149,11 @@ function close() {
 
 async function save() {
   try {
-    // Validate
     if (!form.value.key || !form.value.title || form.value.locations.length === 0 || form.value.fields.length === 0) {
       alert('Please fill in required fields, select at least one location, and add at least one field')
       return
     }
 
-    // Upload to API
     const blob = new Blob([JSON.stringify(form.value, null, 2)], { type: 'application/json' })
     const file = new File([blob], `${form.value.key}.json`, { type: 'application/json' })
 

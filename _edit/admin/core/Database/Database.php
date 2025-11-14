@@ -23,7 +23,6 @@ class Database
     private function connect(): void
     {
         try {
-            // Ensure directory exists with secure permissions
             $dir = dirname($this->dbPath);
             if (!is_dir($dir)) {
                 mkdir($dir, 0750, true);
@@ -40,7 +39,6 @@ class Database
                 ]
             );
 
-            // Enable foreign keys
             $this->pdo->exec('PRAGMA foreign_keys = ON');
         } catch (PDOException $e) {
             throw new \RuntimeException("Database connection failed: {$e->getMessage()}");
@@ -49,7 +47,6 @@ class Database
 
     private function initialize(): void
     {
-        // Check if tables exist
         $tableCheck = $this->query(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='content'"
         );
@@ -59,20 +56,17 @@ class Database
         if ($isNewDatabase) {
             $this->createSchema();
         } else {
-            // For existing databases, ensure new tables exist (migrations)
             $this->runMigrations();
         }
     }
 
     private function runMigrations(): void
     {
-        // Check if settings table exists
         $settingsCheck = $this->query(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='settings'"
         );
 
         if (empty($settingsCheck)) {
-            // Create settings table
             $this->execute("
                 CREATE TABLE IF NOT EXISTS settings (
                     key TEXT PRIMARY KEY,
@@ -83,13 +77,11 @@ class Database
             ");
         }
 
-        // Check if email_tokens table exists
         $emailTokensCheck = $this->query(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='email_tokens'"
         );
 
         if (empty($emailTokensCheck)) {
-            // Create email_tokens table for single-use email sending tokens
             $this->execute("
                 CREATE TABLE IF NOT EXISTS email_tokens (
                     token TEXT PRIMARY KEY,
@@ -98,17 +90,14 @@ class Database
                 )
             ");
 
-            // Add index for cleanup queries
             $this->execute("CREATE INDEX IF NOT EXISTS idx_email_tokens_expires ON email_tokens(expires_at)");
         }
 
-        // Check if email_logs table exists
         $emailLogsCheck = $this->query(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='email_logs'"
         );
 
         if (empty($emailLogsCheck)) {
-            // Create email_logs table to track all email sends
             $this->execute("
                 CREATE TABLE IF NOT EXISTS email_logs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -121,17 +110,14 @@ class Database
                 )
             ");
 
-            // Add index for querying logs
             $this->execute("CREATE INDEX IF NOT EXISTS idx_email_logs_created ON email_logs(created_at DESC)");
         }
 
-        // Check if rate_limits table exists
         $rateLimitsCheck = $this->query(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='rate_limits'"
         );
 
         if (empty($rateLimitsCheck)) {
-            // Create rate_limits table for tracking request attempts
             $this->execute("
                 CREATE TABLE IF NOT EXISTS rate_limits (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -144,24 +130,19 @@ class Database
                 )
             ");
 
-            // Add indexes for rate limit queries
             $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_ip_endpoint ON rate_limits(ip_address, endpoint)");
             $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_window ON rate_limits(window_start)");
             $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_locked ON rate_limits(locked_until)");
         }
 
-        // Add missing performance indexes for existing tables
-        // These are safe to run even if indexes already exist (IF NOT EXISTS)
         $this->execute("CREATE INDEX IF NOT EXISTS idx_meta_value ON content_meta(meta_value)");
         $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_locked ON rate_limits(locked_until)");
 
-        // Check if sessions table exists
         $sessionsCheck = $this->query(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'"
         );
 
         if (empty($sessionsCheck)) {
-            // Create sessions table for session-based authentication
             $this->execute("
                 CREATE TABLE IF NOT EXISTS sessions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -184,9 +165,6 @@ class Database
         $this->beginTransaction();
 
         try {
-            // Content table - single table for all content types
-            // Only stores core fields: id, type, slug, status, author_id, dates
-            // Everything else goes in content_meta
             $this->execute("
                 CREATE TABLE IF NOT EXISTS content (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -201,7 +179,6 @@ class Database
                 )
             ");
 
-            // Content meta - WordPress-style meta table
             $this->execute("
                 CREATE TABLE IF NOT EXISTS content_meta (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -212,17 +189,14 @@ class Database
                 )
             ");
 
-            // Indexes for content
             $this->execute("CREATE INDEX IF NOT EXISTS idx_content_type ON content(type)");
             $this->execute("CREATE INDEX IF NOT EXISTS idx_content_slug ON content(slug)");
             $this->execute("CREATE INDEX IF NOT EXISTS idx_content_status ON content(status)");
 
-            // Indexes for content_meta
             $this->execute("CREATE INDEX IF NOT EXISTS idx_meta_content_id ON content_meta(content_id)");
             $this->execute("CREATE INDEX IF NOT EXISTS idx_meta_key ON content_meta(meta_key)");
             $this->execute("CREATE INDEX IF NOT EXISTS idx_meta_value ON content_meta(meta_value)");
 
-            // Users table
             $this->execute("
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -233,7 +207,6 @@ class Database
                 )
             ");
 
-            // Media table
             $this->execute("
                 CREATE TABLE IF NOT EXISTS media (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -246,7 +219,6 @@ class Database
                 )
             ");
 
-            // Settings table - key-value pairs for system settings
             $this->execute("
                 CREATE TABLE IF NOT EXISTS settings (
                     key TEXT PRIMARY KEY,
@@ -256,7 +228,6 @@ class Database
                 )
             ");
 
-            // Email tokens table - single-use tokens for email sending
             $this->execute("
                 CREATE TABLE IF NOT EXISTS email_tokens (
                     token TEXT PRIMARY KEY,
@@ -267,7 +238,6 @@ class Database
 
             $this->execute("CREATE INDEX IF NOT EXISTS idx_email_tokens_expires ON email_tokens(expires_at)");
 
-            // Email logs table - track all email sends
             $this->execute("
                 CREATE TABLE IF NOT EXISTS email_logs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -282,7 +252,6 @@ class Database
 
             $this->execute("CREATE INDEX IF NOT EXISTS idx_email_logs_created ON email_logs(created_at DESC)");
 
-            // Rate limits table - track API request attempts
             $this->execute("
                 CREATE TABLE IF NOT EXISTS rate_limits (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -298,7 +267,6 @@ class Database
             $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_ip_endpoint ON rate_limits(ip_address, endpoint)");
             $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_window ON rate_limits(window_start)");
 
-            // Sessions table - for session-based authentication
             $this->execute("
                 CREATE TABLE IF NOT EXISTS sessions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -401,8 +369,7 @@ class Database
                 "DELETE FROM email_tokens WHERE expires_at < datetime('now')"
             );
         } catch (\Exception $e) {
-            // Silently fail - this is a cleanup operation, not critical
-            // Log if you have logging system
+            // Silently fail - cleanup is not critical
         }
     }
 
@@ -417,7 +384,7 @@ class Database
                 "DELETE FROM sessions WHERE expires_at < datetime('now')"
             );
         } catch (\Exception $e) {
-            // Silently fail - this is a cleanup operation, not critical
+            // Silently fail - cleanup is not critical
         }
     }
 

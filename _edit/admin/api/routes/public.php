@@ -17,12 +17,10 @@ use Edit\Core\ContentTypes\ContentType;
  */
 function handlePublicRoutes(string $method, string $path, Database $db, ContentTypeRegistry $registry, BlockRegistry $blocks): bool
 {
-    // Rate limiting for public API (100 requests per minute)
     if (str_starts_with($path, '/public/') && $path !== '/public/docs') {
         checkRateLimit($db, 'public_api', 100, 1);
     }
 
-    // Serve API documentation
     if ($path === '/public/docs' && $method === 'GET') {
         $docsPath = EDIT_BASE_PATH . '/admin/PUBLIC-API.md';
         if (file_exists($docsPath)) {
@@ -34,12 +32,10 @@ function handlePublicRoutes(string $method, string $path, Database $db, ContentT
         return true;
     }
 
-    // Match public content routes
     if ($method === 'GET' && preg_match('#^/public/([a-z_-]+)(/([a-z0-9_-]+))?$#', $path, $matches)) {
         $type = $matches[1];
         $slug = $matches[3] ?? null;
 
-        // Check if content type exists
         if (!$registry->exists($type)) {
             sendError("Content type '{$type}' not found", 404);
         }
@@ -48,14 +44,12 @@ function handlePublicRoutes(string $method, string $path, Database $db, ContentT
 
         try {
             if ($slug) {
-                // Get single item by slug
                 $item = getPublicContentBySlug($contentType, $registry, $slug);
                 if (!$item) {
                     sendError('Content not found', 404);
                 }
                 sendJson($item);
             } else {
-                // List content with filters
                 $result = getPublicContentList($contentType, $registry, $type);
                 sendJson($result);
             }
@@ -73,7 +67,6 @@ function handlePublicRoutes(string $method, string $path, Database $db, ContentT
  */
 function getPublicContentBySlug(ContentType $contentType, ContentTypeRegistry $registry, string $slug): ?array
 {
-    // Find by slug with published status
     $items = $contentType->all(['status' => 'published', 'slug' => $slug, 'limit' => 1]);
 
     if (empty($items)) {
@@ -82,13 +75,10 @@ function getPublicContentBySlug(ContentType $contentType, ContentTypeRegistry $r
 
     $item = $items[0];
 
-    // Apply field selection if specified
     $item = applyFieldSelection($item, $registry, $_GET);
 
-    // Populate relationships if specified
     $item = populateRelationships($item, $contentType, $registry, $_GET['populate'] ?? '');
 
-    // Remove author_id (never exposed in public API)
     unset($item['author_id']);
 
     return $item;
@@ -99,50 +89,38 @@ function getPublicContentBySlug(ContentType $contentType, ContentTypeRegistry $r
  */
 function getPublicContentList(ContentType $contentType, ContentTypeRegistry $registry, string $type): array
 {
-    // Parse and validate query parameters
     $params = parsePublicQueryParams($_GET);
 
-    // Build filters - always force status=published
     $filters = ['status' => 'published'];
 
-    // Add pagination
     $filters['limit'] = $params['limit'];
     $filters['offset'] = $params['offset'];
 
-    // Add sorting
     if ($params['order_by']) {
         $filters['order_by'] = $params['order_by'];
         $filters['order_dir'] = $params['order_dir'];
     }
 
-    // Apply field filters
     if (!empty($params['field_filters'])) {
         $filters['field_filters'] = $params['field_filters'];
     }
 
-    // Get total count for metadata
     $totalFilters = ['status' => 'published'];
     if (!empty($params['field_filters'])) {
         $totalFilters['field_filters'] = $params['field_filters'];
     }
     $total = $contentType->count($totalFilters);
 
-    // Get items
     $items = $contentType->all($filters);
 
-    // Process each item
     foreach ($items as &$item) {
-        // Apply field selection
         $item = applyFieldSelection($item, $registry, $_GET);
 
-        // Populate relationships
         $item = populateRelationships($item, $contentType, $registry, $params['populate']);
 
-        // Remove author_id
         unset($item['author_id']);
     }
 
-    // Return with metadata
     return [
         'data' => $items,
         'meta' => [
@@ -168,7 +146,6 @@ function parsePublicQueryParams(array $query): array
         'field_filters' => []
     ];
 
-    // Pagination
     if (isset($query['limit'])) {
         $limit = (int) $query['limit'];
         if ($limit < 1 || $limit > 100) {
@@ -185,7 +162,6 @@ function parsePublicQueryParams(array $query): array
         $params['offset'] = $offset;
     }
 
-    // Sorting
     if (isset($query['order_by'])) {
         $params['order_by'] = $query['order_by'];
     }
@@ -198,17 +174,14 @@ function parsePublicQueryParams(array $query): array
         $params['order_dir'] = $orderDir;
     }
 
-    // Populate
     if (isset($query['populate'])) {
         $params['populate'] = $query['populate'];
     }
 
-    // Parse field filters (fields[key]=value, fields[key_gte]=value, etc.)
     foreach ($query as $key => $value) {
         if (preg_match('/^fields\[([^\]]+)\]$/', $key, $matches)) {
             $fieldKey = $matches[1];
 
-            // Check for operator suffix
             $operator = '=';
             if (preg_match('/^(.+)_(gte|lte|like|not)$/', $fieldKey, $opMatches)) {
                 $fieldKey = $opMatches[1];

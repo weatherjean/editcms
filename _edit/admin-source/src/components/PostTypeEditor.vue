@@ -224,7 +224,6 @@ const isEditing = computed(() => !!originalKey.value)
 
 function open(module = null) {
   if (module) {
-    // Editing existing module (post type with field groups)
     const postType = module.post_types[0]
     form.value = {
       key: postType.key,
@@ -235,13 +234,11 @@ function open(module = null) {
       allow_open: postType.allow_open || false,
       field_groups: JSON.parse(JSON.stringify(module.field_groups || []))
     }
-    // Add locations to each field group
     form.value.field_groups.forEach(fg => {
       fg.locations = [postType.key]
     })
     originalKey.value = postType.key
   } else {
-    // Creating new module
     form.value = {
       key: '',
       label: '',
@@ -283,13 +280,11 @@ function removeFieldGroup(index) {
 
 async function save() {
   try {
-    // Validate
     if (!form.value.key || !form.value.label || !form.value.label_plural) {
       alert('Please fill in required fields')
       return
     }
 
-    // Build module structure
     const module = {
       post_types: [
         {
@@ -310,7 +305,6 @@ async function save() {
       }))
     }
 
-    // Upload to API
     const blob = new Blob([JSON.stringify(module, null, 2)], { type: 'application/json' })
     const file = new File([blob], `${form.value.key}.json`, { type: 'application/json' })
 

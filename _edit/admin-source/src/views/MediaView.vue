@@ -5,13 +5,34 @@
         <h1 class="text-3xl font-bold">Media Library</h1>
         <p class="opacity-60 mt-1">Manage your images and files</p>
       </div>
-      <button @click="$refs.fileInput.click()" class="btn btn-primary gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 20 20" fill="currentColor">
+      <button
+        @click="$refs.fileInput.click()"
+        class="btn btn-primary gap-2"
+        :disabled="uploading"
+      >
+        <span v-if="uploading" class="loading loading-spinner loading-sm"></span>
+        <svg v-else xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
         </svg>
-        Upload
+        {{ uploading ? 'Uploading...' : 'Upload' }}
       </button>
-      <input ref="fileInput" type="file" @change="uploadFile" class="hidden">
+      <input ref="fileInput" type="file" @change="handleUpload" class="hidden" :disabled="uploading">
+    </div>
+
+    <!-- Upload Progress Bar -->
+    <div v-if="uploading" class="card bg-base-100 border shadow">
+      <div class="card-body">
+        <div class="flex items-center gap-4">
+          <span class="loading loading-spinner loading-lg"></span>
+          <div class="flex-1">
+            <div class="flex justify-between mb-3">
+              <span class="text-base font-semibold">Uploading...</span>
+              <span class="text-base font-semibold">{{ uploadProgress }}%</span>
+            </div>
+            <progress class="progress progress-primary w-full h-4" :value="uploadProgress" max="100"></progress>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div v-if="mediaItems.length > 0" class="card bg-base-100 border shadow">
@@ -86,68 +107,67 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useApi } from '../composables/useApi'
+import { useToast } from '../composables/useToast'
+import { useConfirm } from '../composables/useConfirm'
+import { useMedia } from '../composables/useMedia'
 
 const { apiRequest } = useApi()
+const { success, error } = useToast()
+const { confirm: confirmDialog } = useConfirm()
+const { fetchMedia, uploadFile: uploadMediaFile, uploading, uploadProgress } = useMedia()
 
 const mediaItems = ref([])
 
 async function loadMedia() {
   try {
-    mediaItems.value = await apiRequest('GET', '/media')
-  } catch (error) {
-    console.error('Failed to load media:', error)
+    mediaItems.value = await fetchMedia()
+  } catch (err) {
+    console.error('Failed to load media:', err)
   }
 }
 
-async function uploadFile(event) {
+async function handleUpload(event) {
   const file = event.target.files[0]
   if (!file) return
 
-  const formData = new FormData()
-  formData.append('file', file)
-
   try {
-    const token = localStorage.getItem('edit_token')
-    // Use direct PHP backend URL for file uploads (Vite proxy doesn't handle FormData well)
-    const response = await fetch('http://localhost:8001/_edit/api/media', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
-      body: formData
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Upload failed' }))
-      throw new Error(errorData.error || 'Upload failed')
-    }
-
+    await uploadMediaFile(file)
     await loadMedia()
     event.target.value = ''
-  } catch (error) {
-    alert('Upload failed: ' + error.message)
-    console.error('Upload error:', error)
+    success('File uploaded successfully!')
+  } catch (err) {
+    error('Upload failed: ' + err.message)
+    console.error('Upload error:', err)
+  } finally {
+    event.target.value = ''
   }
 }
 
 async function deleteMedia(id) {
-  if (!confirm('Delete this media?')) return
+  const confirmed = await confirmDialog('Are you sure you want to delete this media file?', {
+    title: 'Delete Media',
+    variant: 'error',
+    confirmText: 'Delete'
+  })
+
+  if (!confirmed) return
 
   try {
     await apiRequest('DELETE', `/media/${id}`)
     await loadMedia()
-  } catch (error) {
-    alert('Failed to delete: ' + error.message)
+    success('Media deleted successfully!')
+  } catch (err) {
+    error('Failed to delete: ' + err.message)
   }
 }
 
 async function copyUrl(url) {
   try {
     await navigator.clipboard.writeText(url)
-    alert('URL copied to clipboard!')
-  } catch (error) {
-    console.error('Failed to copy URL:', error)
-    alert('Failed to copy URL')
+    success('URL copied to clipboard!')
+  } catch (err) {
+    console.error('Failed to copy URL:', err)
+    error('Failed to copy URL')
   }
 }
 

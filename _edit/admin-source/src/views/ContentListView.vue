@@ -38,7 +38,7 @@
                 </span>
               </td>
               <td>
-                <div class="opacity-60">{{ formatDate(item.created_at) }}</div>
+                <div class="opacity-60">{{ formatDateTime(item.created_at) }}</div>
               </td>
               <td class="text-right">
                 <div class="join">
@@ -71,12 +71,18 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useApi } from '../composables/useApi'
+import { useToast } from '../composables/useToast'
+import { useConfirm } from '../composables/useConfirm'
+import { useDate } from '../composables/useDate'
 
 const router = useRouter()
 const route = useRoute()
 const props = defineProps(['postTypes'])
 
 const { apiRequest } = useApi()
+const { success, error } = useToast()
+const { confirm: confirmDialog } = useConfirm()
+const { formatDateTime } = useDate()
 
 const contentItems = ref([])
 
@@ -106,22 +112,23 @@ function editContent(id) {
 }
 
 async function deleteContent(id) {
-  if (!confirm('Delete this item?')) return
+  const confirmed = await confirmDialog('Are you sure you want to delete this item?', {
+    title: 'Delete Content',
+    variant: 'error',
+    confirmText: 'Delete'
+  })
+
+  if (!confirmed) return
 
   try {
     await apiRequest('DELETE', `/${currentType.value}/${id}`)
     await loadContent()
-  } catch (error) {
-    alert('Failed to delete: ' + error.message)
+    success('Content deleted successfully!')
+  } catch (err) {
+    error('Failed to delete: ' + err.message)
   }
 }
 
-function formatDate(dateString) {
-  const date = new Date(dateString)
-  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString()
-}
-
-// Watch for type changes
 watch(currentType, () => {
   loadContent()
 }, { immediate: true })

@@ -52,6 +52,14 @@ function getAuthHeader(): string
 }
 
 /**
+ * Strip "Bearer " prefix from auth token
+ */
+function stripBearerPrefix(string $token): string
+{
+    return preg_replace('/^Bearer\s+/', '', $token);
+}
+
+/**
  * Rate limiting with exponential backoff
  *
  * @param Database $db Database instance
@@ -63,22 +71,20 @@ function getAuthHeader(): string
 function checkRateLimit(Database $db, string $endpoint, int $maxAttempts = 10, int $windowMinutes = 15): void
 {
     $ipAddress = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-    $now = date('Y-m-d H:i:s');
-    $oneHourAgo = date('Y-m-d H:i:s', strtotime('-1 hour'));
-    $windowStart = date('Y-m-d H:i:s', strtotime("-{$windowMinutes} minutes"));
+    $currentTime = now();
+    $oneHourAgo = dateTime('-1 hour');
+    $windowStart = dateTime("-{$windowMinutes} minutes");
 
-    // Clean up old rate limit records (older than 1 hour)
     $db->execute(
         "DELETE FROM rate_limits WHERE window_start < ? AND (locked_until IS NULL OR locked_until < ?)",
-        [$oneHourAgo, $now]
+        [$oneHourAgo, $currentTime]
     );
 
-    // Check if currently locked out
     $lockCheck = $db->table('rate_limits')
         ->select(['locked_until'])
         ->where('ip_address', $ipAddress)
         ->where('endpoint', $endpoint)
-        ->where('locked_until', '>', $now)
+        ->where('locked_until', '>', $currentTime)
         ->first();
 
     if ($lockCheck) {
@@ -88,17 +94,15 @@ function checkRateLimit(Database $db, string $endpoint, int $maxAttempts = 10, i
         sendError("Rate limit exceeded. Try again in " . ceil($secondsRemaining / 60) . " minutes.", 429);
     }
 
-    // ATOMIC OPERATION: Insert or reset window if expired
     $db->execute(
         "INSERT INTO rate_limits (ip_address, endpoint, attempts, window_start) VALUES (?, ?, 0, ?)
          ON CONFLICT(ip_address, endpoint) DO UPDATE SET
             attempts = CASE WHEN window_start <= ? THEN 0 ELSE attempts END,
             window_start = CASE WHEN window_start <= ? THEN ? ELSE window_start END,
             locked_until = NULL",
-        [$ipAddress, $endpoint, $now, $windowStart, $windowStart, $now]
+        [$ipAddress, $endpoint, $currentTime, $windowStart, $windowStart, $currentTime]
     );
 
-    // ATOMIC OPERATION: Increment if under limit, using WHERE clause
     $result = $db->execute(
         "UPDATE rate_limits
          SET attempts = attempts + 1
@@ -106,9 +110,7 @@ function checkRateLimit(Database $db, string $endpoint, int $maxAttempts = 10, i
         [$ipAddress, $endpoint, $maxAttempts]
     );
 
-    // If no rows updated, rate limit exceeded
     if ($result === 0) {
-        // Get current attempts to calculate lockout
         $record = $db->table('rate_limits')
             ->select(['attempts'])
             ->where('ip_address', $ipAddress)
@@ -121,9 +123,8 @@ function checkRateLimit(Database $db, string $endpoint, int $maxAttempts = 10, i
         // 1st violation: 1 minute, 2nd: 5 minutes, 3rd+: 15 minutes
         $violations = floor($currentAttempts / $maxAttempts);
         $lockoutMinutes = min(15, pow(5, min($violations, 2)));
-        $lockedUntil = date('Y-m-d H:i:s', strtotime("+{$lockoutMinutes} minutes"));
+        $lockedUntil = dateTime("+{$lockoutMinutes} minutes");
 
-        // Set lockout
         $db->table('rate_limits')
             ->where('ip_address', $ipAddress)
             ->where('endpoint', $endpoint)
@@ -213,13 +214,13 @@ function saveSetting(Database $db, string $key, string $value): void
             ->where('key', $key)
             ->update([
                 'value' => $value,
-                'updated_at' => date('Y-m-d H:i:s')
+                'updated_at' => now()
             ]);
     } else {
         $db->table('settings')->insert([
             'key' => $key,
             'value' => $value,
-            'updated_at' => date('Y-m-d H:i:s')
+            'updated_at' => now()
         ]);
     }
 }
@@ -236,13 +237,10 @@ function addMediaUrl(array|null $media): array|null
         return null;
     }
 
-    // Check if it's a single item (has 'path' key) or array of items
     if (isset($media['path'])) {
-        // Single item
         $media['url'] = '/_edit/uploads/' . $media['path'];
         return $media;
     } else {
-        // Array of items
         foreach ($media as &$item) {
             if (isset($item['path'])) {
                 $item['url'] = '/_edit/uploads/' . $item['path'];
@@ -263,12 +261,7 @@ function addMediaUrl(array|null $media): array|null
 function checkMediaUsage(Database $db, int $mediaId): bool
 {
     // Use SQL to check for media usage - much faster than loading all records into PHP
-    // Check for:
-    // 1. Direct match: meta_value = 'mediaId'
-    // 2. JSON occurrence: meta_value contains the media ID in various JSON formats
-    //    - As number: "123" or ":123," or ":123}"
-    //    - As string: "\"123\"" (quoted string in JSON)
-
+    // Checks for: Direct match ("123"), JSON number (":123," or ":123}"), JSON string ("\"123\"")
     $count = $db->query(
         "SELECT COUNT(*) as count FROM content_meta
          WHERE meta_value = ?
@@ -284,4 +277,54 @@ function checkMediaUsage(Database $db, int $mediaId): bool
     );
 
     return ($count[0]['count'] ?? 0) > 0;
+}
+
+/**
+ * Get current datetime in standard format
+ *
+ * @return string Current datetime string (Y-m-d H:i:s)
+ */
+function now(): string
+{
+    return date('Y-m-d H:i:s');
+}
+
+/**
+ * Get datetime string from timestamp or strtotime-compatible string
+ *
+ * @param int|string $time Timestamp or strtotime string (e.g., '+1 hour', '-30 minutes')
+ * @return string Formatted datetime string (Y-m-d H:i:s)
+ */
+function dateTime(int|string $time): string
+{
+    if (is_string($time)) {
+        $time = strtotime($time);
+    }
+    return date('Y-m-d H:i:s', $time);
+}
+
+/**
+ * List config JSON files in a directory
+ *
+ * @param string $path Directory path to scan
+ * @return array Array of file info (name, filename, size, modified)
+ */
+function listConfigFiles(string $path): array
+{
+    $result = [];
+
+    if (!is_dir($path)) {
+        return $result;
+    }
+
+    foreach (glob($path . '/*.json') as $file) {
+        $result[] = [
+            'name' => basename($file, '.json'),
+            'filename' => basename($file),
+            'size' => filesize($file),
+            'modified' => filemtime($file)
+        ];
+    }
+
+    return $result;
 }

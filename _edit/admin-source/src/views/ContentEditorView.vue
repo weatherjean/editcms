@@ -1,8 +1,5 @@
 <template>
   <div class="space-y-6">
-    <!-- Toast Notification -->
-    <Toast :show="showToast" :message="toastMessage" type="success" />
-
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-3xl font-bold">{{ isCreating ? 'New' : 'Edit' }} {{ currentPostType?.label }}</h1>
@@ -97,7 +94,8 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useApi } from '../composables/useApi'
-import Toast from '../components/Toast.vue'
+import { useMedia } from '../composables/useMedia'
+import { useToast } from '../composables/useToast'
 import FieldRenderer from '../components/FieldRenderer.vue'
 import RepeaterField from '../components/RepeaterField.vue'
 import MediaModal from '../components/MediaModal.vue'
@@ -109,6 +107,8 @@ const route = useRoute()
 const props = defineProps(['postTypes', 'fieldGroups'])
 
 const { apiRequest } = useApi()
+const { fetchMedia, uploadFile } = useMedia()
+const { success, error } = useToast()
 
 const currentType = computed(() => route.params.type)
 const currentId = computed(() => route.params.id || null)
@@ -122,8 +122,6 @@ const form = ref({
 const mediaItems = ref([])
 const mediaModalRef = ref(null)
 const currentMediaFieldKey = ref(null)
-const showToast = ref(false)
-const toastMessage = ref('')
 const currentMediaTarget = ref(null) // For repeater items
 
 const relationshipData = ref({})
@@ -169,7 +167,6 @@ async function loadContentItem() {
 }
 
 async function resetForm() {
-  // Initialize all fields to ensure reactivity
   const initializedFields = {}
   assignedFieldGroups.value.forEach(group => {
     group.fields.forEach(field => {
@@ -177,7 +174,6 @@ async function resetForm() {
     })
   })
 
-  // Initialize flexible content field if post type allows it
   if (currentPostType.value?.allow_open) {
     initializedFields.flexible_content = []
   }
@@ -188,7 +184,6 @@ async function resetForm() {
     fields: initializedFields
   }
 
-  // Load media items and blocks so they can display correctly
   await loadMedia()
   await loadBlocks()
 }
@@ -200,7 +195,6 @@ async function saveContent() {
       ? `/${currentType.value}`
       : `/${currentType.value}/${currentId.value}`
 
-    // Normalize media fields: convert full media objects to IDs before saving
     const normalizedForm = { ...form.value }
     if (normalizedForm.fields) {
       normalizedForm.fields = normalizeMediaFields(normalizedForm.fields)
@@ -208,18 +202,15 @@ async function saveContent() {
 
     const result = await apiRequest(method, url, normalizedForm)
 
-    // If creating, navigate to edit mode with the new ID
     if (isCreating.value && result.id) {
       router.push(`/${currentType.value}/${result.id}`)
     } else {
-      // Reload the content to get updated data
       await loadContentItem()
     }
 
-    // Show success toast
-    displayToast(isCreating.value ? 'Created successfully!' : 'Saved successfully!')
-  } catch (error) {
-    alert('Failed to save: ' + error.message)
+    success(isCreating.value ? 'Created successfully!' : 'Saved successfully!')
+  } catch (err) {
+    error('Failed to save: ' + err.message)
   }
 }
 
@@ -229,7 +220,6 @@ function normalizeMediaFields(fields) {
   Object.keys(fields).forEach(key => {
     const value = fields[key]
 
-    // Handle arrays (repeater fields)
     if (Array.isArray(value)) {
       normalized[key] = value.map(item => {
         if (typeof item === 'object' && item !== null) {
@@ -238,11 +228,9 @@ function normalizeMediaFields(fields) {
         return item
       })
     }
-    // Handle media objects
     else if (value && typeof value === 'object' && value.id && value.url) {
       normalized[key] = value.id
     }
-    // Handle regular values
     else {
       normalized[key] = value
     }
@@ -251,30 +239,20 @@ function normalizeMediaFields(fields) {
   return normalized
 }
 
-function displayToast(message) {
-  toastMessage.value = message
-  showToast.value = true
-  setTimeout(() => {
-    showToast.value = false
-  }, 3000)
-}
-
 function goBack() {
   router.push(`/${currentType.value}`)
 }
-
-// Media functions
 async function loadMedia() {
   try {
-    mediaItems.value = await apiRequest('GET', '/media')
-  } catch (error) {
-    console.error('Failed to load media:', error)
+    mediaItems.value = await fetchMedia()
+  } catch (err) {
+    console.error('Failed to load media:', err)
   }
 }
 
 function openMediaModal(fieldKey, target = null) {
   currentMediaFieldKey.value = fieldKey
-  currentMediaTarget.value = target // null for regular fields, item object for repeater items
+  currentMediaTarget.value = target
   loadMedia()
   mediaModalRef.value?.open()
 }
@@ -286,15 +264,12 @@ function closeMediaModal() {
 
 function selectMediaItem(mediaId) {
   if (currentMediaFieldKey.value) {
-    // Find the full media object
     const mediaObject = mediaItems.value.find(m => m.id === mediaId)
 
     if (mediaObject) {
-      // If target is set (repeater item), set on the item object
       if (currentMediaTarget.value) {
         currentMediaTarget.value[currentMediaFieldKey.value] = mediaObject
       } else {
-        // Otherwise set on the main form fields
         form.value.fields[currentMediaFieldKey.value] = mediaObject
       }
     }
@@ -304,36 +279,17 @@ function selectMediaItem(mediaId) {
 async function uploadMediaFile(file) {
   if (!file) return
 
-  const formData = new FormData()
-  formData.append('file', file)
-
   try {
-    const token = localStorage.getItem('edit_token')
-    const response = await fetch('http://localhost:8001/_edit/api/media', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
-      body: formData
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Upload failed' }))
-      throw new Error(errorData.error || 'Upload failed')
-    }
-
+    await uploadFile(file)
     await loadMedia()
-  } catch (error) {
-    alert('Upload failed: ' + error.message)
-    console.error('Upload error:', error)
+  } catch (err) {
+    error('Upload failed: ' + err.message)
+    console.error('Upload error:', err)
   }
 }
-
-// Relationship functions
 async function loadRelationshipItems(postType) {
   if (!postType) return
 
-  // Check if already loaded
   if (relationshipData.value[postType]) return
 
   try {
@@ -344,8 +300,6 @@ async function loadRelationshipItems(postType) {
     relationshipData.value[postType] = []
   }
 }
-
-// Block functions
 async function loadBlocks() {
   try {
     availableBlocks.value = await apiRequest('GET', '/blocks')
@@ -355,7 +309,6 @@ async function loadBlocks() {
   }
 }
 
-// Watch for changes
 watch(currentId, async () => {
   if (isCreating.value) {
     await resetForm()

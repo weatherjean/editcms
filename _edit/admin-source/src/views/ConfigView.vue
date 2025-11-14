@@ -224,11 +224,15 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useApi } from '../composables/useApi'
+import { useToast } from '../composables/useToast'
+import { useConfirm } from '../composables/useConfirm'
 import PostTypeEditor from '../components/PostTypeEditor.vue'
 import FieldGroupEditor from '../components/FieldGroupEditor.vue'
 import BlockEditor from '../components/BlockEditor.vue'
 
 const { apiRequest } = useApi()
+const { success: showSuccess, error: showError } = useToast()
+const { confirm: confirmDialog } = useConfirm()
 
 const config = ref({
   modules: [],
@@ -262,21 +266,9 @@ async function loadConfig() {
     const data = await apiRequest('GET', '/config')
     config.value = data
 
-    // Load full JSON data for each item
-    modules.value = await Promise.all(data.modules.map(async file => {
-      const json = await loadJsonFile('modules', file.name)
-      return { file, data: json }
-    }))
-
-    fieldGroups.value = await Promise.all(data.field_groups.map(async file => {
-      const json = await loadJsonFile('field-groups', file.name)
-      return { file, data: json }
-    }))
-
-    blocks.value = await Promise.all(data.blocks.map(async file => {
-      const json = await loadJsonFile('blocks', file.name)
-      return { file, data: json }
-    }))
+    modules.value = await loadConfigType('modules', data.modules)
+    fieldGroups.value = await loadConfigType('field-groups', data.field_groups)
+    blocks.value = await loadConfigType('blocks', data.blocks)
   } catch (err) {
     console.error('Failed to load config:', err)
   } finally {
@@ -299,7 +291,12 @@ async function loadJsonFile(type, name) {
   }
 }
 
-// Post Type Actions
+async function loadConfigType(type, files) {
+  return await Promise.all(files.map(async file => {
+    const json = await loadJsonFile(type, file.name)
+    return { file, data: json }
+  }))
+}
 function createPostType() {
   postTypeEditorRef.value?.open()
 }
@@ -308,7 +305,6 @@ function editPostType(module) {
   postTypeEditorRef.value?.open(module.data)
 }
 
-// Field Group Actions
 function createFieldGroup() {
   fieldGroupEditorRef.value?.open()
 }
@@ -317,7 +313,6 @@ function editFieldGroup(fg) {
   fieldGroupEditorRef.value?.open(fg.data)
 }
 
-// Block Actions
 function createBlock() {
   blockEditorRef.value?.open()
 }
@@ -325,8 +320,6 @@ function createBlock() {
 function editBlock(block) {
   blockEditorRef.value?.open(block.data)
 }
-
-// Download
 async function downloadFile(type, name) {
   try {
     const response = await fetch(`/_edit/api/config/${type}/${name}`, {
@@ -344,12 +337,12 @@ async function downloadFile(type, name) {
     link.download = `${name}.json`
     link.click()
     window.URL.revokeObjectURL(url)
+    showSuccess('File downloaded successfully!')
   } catch (err) {
-    alert(err.message || 'Download failed')
+    showError(err.message || 'Download failed')
   }
 }
 
-// Export/Import All
 async function exportAll() {
   try {
     const response = await fetch('/_edit/api/config/export', {
@@ -367,8 +360,9 @@ async function exportAll() {
     link.download = `edit-config-${new Date().toISOString().split('T')[0]}.zip`
     link.click()
     window.URL.revokeObjectURL(url)
+    showSuccess('Configuration exported successfully!')
   } catch (err) {
-    alert(err.message || 'Export failed')
+    showError(err.message || 'Export failed')
   }
 }
 
@@ -376,7 +370,13 @@ async function handleImportAll(event) {
   const file = event.target.files[0]
   if (!file) return
 
-  if (!confirm('Import will replace existing configuration files with the same names. Continue?')) {
+  const confirmed = await confirmDialog('Import will replace existing configuration files with the same names. Continue?', {
+    title: 'Import Configuration',
+    variant: 'warning',
+    confirmText: 'Import'
+  })
+
+  if (!confirmed) {
     event.target.value = ''
     return
   }
@@ -391,22 +391,23 @@ async function handleImportAll(event) {
 
     await handleSaved()
 
-    // Show detailed results
-    const summary = `Imported:\n- ${result.imported.modules} modules\n- ${result.imported.field_groups} field groups\n- ${result.imported.blocks} blocks\n\nBackup saved: ${result.backup}`
+    const summaryParts = [
+      `Imported ${result.imported.modules} modules, ${result.imported.field_groups} field groups, and ${result.imported.blocks} blocks.`,
+      `Backup saved: ${result.backup}`
+    ]
 
     if (result.errors && result.errors.length > 0) {
-      alert(`${summary}\n\nErrors:\n${result.errors.join('\n')}`)
+      showError(`Import completed with errors: ${result.errors.join(', ')}`)
     } else {
-      alert(`${summary}\n\nAll files imported successfully!`)
+      showSuccess(summaryParts.join(' '))
     }
   } catch (err) {
-    alert(err.message || 'Import failed')
+    showError(err.message || 'Import failed')
   }
 
   event.target.value = ''
 }
 
-// Delete
 function confirmDelete(type, file) {
   deleteType.value = type
   deleteTarget.value = file
@@ -438,7 +439,6 @@ function closeDeleteModal() {
   error.value = null
 }
 
-// After any save/delete
 async function handleSaved() {
   await loadConfig()
   emit('reload')

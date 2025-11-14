@@ -17,7 +17,6 @@ use Edit\Core\Security\Security;
  */
 function handleUserRoutes(string $method, string $path, Database $db, Auth $auth, int $userId): bool
 {
-    // Get all users
     if ($path === '/users' && $method === 'GET') {
         $users = $db->table('users')
             ->select(['id', 'name', 'email', 'created_at'])
@@ -27,7 +26,6 @@ function handleUserRoutes(string $method, string $path, Database $db, Auth $auth
         return true;
     }
 
-    // Create new user (admin only)
     if ($path === '/users' && $method === 'POST') {
         $data = getJsonBody();
         requireFields($data, ['email', 'password', 'name']);
@@ -45,7 +43,6 @@ function handleUserRoutes(string $method, string $path, Database $db, Auth $auth
         return true;
     }
 
-    // Update user password
     if (preg_match('#^/users/(\d+)$#', $path, $matches) && $method === 'PUT') {
         $targetUserId = (int)$matches[1];
         $data = getJsonBody();
@@ -67,7 +64,6 @@ function handleUserRoutes(string $method, string $path, Database $db, Auth $auth
         return true;
     }
 
-    // Delete user
     if (preg_match('#^/users/(\d+)$#', $path, $matches) && $method === 'DELETE') {
         $targetUserId = (int)$matches[1];
 

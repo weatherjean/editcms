@@ -170,6 +170,12 @@
         @reload="loadData" />
     </main>
   </div>
+
+  <!-- Global Toast Container -->
+  <ToastContainer />
+
+  <!-- Global Confirm Dialog -->
+  <ConfirmDialog />
 </template>
 
 <script setup>
@@ -177,33 +183,27 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from './composables/useAuth'
 import { useApi } from './composables/useApi'
+import ToastContainer from './components/ToastContainer.vue'
+import ConfirmDialog from './components/ConfirmDialog.vue'
 
-// Router
 const router = useRouter()
 const route = useRoute()
 
-// Auth
 const { user, isAuthenticated, isFirstTimeSetup, checkFirstTimeSetup, verifyAuth, login, register, logout } = useAuth()
 const { apiRequest } = useApi()
 
-// Forms
 const loginForm = ref({ email: '', password: '' })
 const registerForm = ref({ name: '', email: '', password: '' })
 const showRegister = ref(false)
 const authError = ref(null)
-const checkingAuth = ref(true) // Loading state while checking authentication
+const checkingAuth = ref(true)
 
-// Theme
 const isDarkMode = ref(false)
 
-// Data
 const postTypes = ref([])
 const fieldGroups = ref([])
 
-// Current state from route
 const currentType = computed(() => route.params.type || null)
-
-// Methods
 async function handleLogin() {
   authError.value = null
   try {

@@ -61,16 +61,13 @@ export function useAuth() {
   }
 
   async function logout() {
-    // Call backend to invalidate session
     try {
       await apiRequest('POST', '/auth/logout')
     } catch (error) {
-      // Ignore errors - clear local state anyway
       console.warn('Logout API call failed:', error)
     }
 
-    // Clear local state
-    token.value = null  // localStorage sync happens via watch
+    token.value = null
     user.value = null
   }
 

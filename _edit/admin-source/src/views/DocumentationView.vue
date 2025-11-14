@@ -54,7 +54,6 @@ const loading = ref(true)
 const error = ref(null)
 const renderedMarkdown = ref('')
 
-// Helper function to generate slug from text
 function slugify(text) {
   return text
     .toLowerCase()
@@ -63,8 +62,6 @@ function slugify(text) {
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '')
 }
-
-// Configure marked with syntax highlighting using the modern API
 marked.use({
   gfm: true,
   breaks: true,
@@ -82,7 +79,6 @@ marked.use({
         }
       }
 
-      // For unknown languages or no language specified, return escaped plain code
       const escaped = code
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -122,23 +118,17 @@ async function loadDocumentation() {
 function handleLinkClick(event) {
   const target = event.target
 
-  // Check if clicked element is an anchor link
   if (target.tagName === 'A' && target.hash) {
     const hash = target.hash
 
-    // Only handle internal anchor links (starting with #)
     if (hash.startsWith('#')) {
       event.preventDefault()
 
-      // Find the target element
       const targetId = hash.substring(1)
       const targetElement = document.getElementById(targetId)
 
       if (targetElement) {
-        // Smooth scroll to the element
         targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
-
-        // Optional: Update URL without triggering router
         window.history.replaceState(null, '', `#/docs${hash}`)
       }
     }

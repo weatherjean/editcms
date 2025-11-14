@@ -108,7 +108,6 @@ const isEditing = computed(() => !!originalKey.value)
 
 function open(block = null) {
   if (block) {
-    // Editing existing block
     form.value = {
       key: block.key,
       label: block.label,
@@ -118,7 +117,6 @@ function open(block = null) {
     }
     originalKey.value = block.key
   } else {
-    // Creating new block
     form.value = {
       key: '',
       label: '',
@@ -137,13 +135,11 @@ function close() {
 
 async function save() {
   try {
-    // Validate
     if (!form.value.key || !form.value.label || form.value.fields.length === 0) {
       alert('Please fill in required fields and add at least one field')
       return
     }
 
-    // Upload to API
     const blob = new Blob([JSON.stringify(form.value, null, 2)], { type: 'application/json' })
     const file = new File([blob], `${form.value.key}.json`, { type: 'application/json' })
 

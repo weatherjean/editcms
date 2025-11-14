@@ -207,10 +207,8 @@ const fields = ref(props.modelValue || [])
 const editingIndex = ref(null)
 const selectChoicesText = ref({})
 
-// Initialize select choices text
 watch(() => props.modelValue, (newVal) => {
   fields.value = newVal || []
-  // Initialize select choices text for existing select fields
   fields.value.forEach((field, index) => {
     if (field.type === 'select' && field.config?.choices) {
       selectChoicesText.value[index] = formatSelectChoices(field.config.choices)

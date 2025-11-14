@@ -62,7 +62,6 @@ class ContentType
                 throw new \RuntimeException("Slug already exists for this content type");
             }
 
-            // Insert into content table
             $contentId = $this->db->table('content')->insert([
                 'type' => $this->type,
                 'slug' => $slug,
@@ -78,7 +77,12 @@ class ContentType
             $this->db->commit();
             return $contentId;
         } catch (\Exception $e) {
-            $this->db->rollback();
+            try {
+                $this->db->rollback();
+            } catch (\Exception $rollbackEx) {
+                // Log rollback failure but don't mask original error
+                error_log("Rollback failed: " . $rollbackEx->getMessage());
+            }
             throw new \RuntimeException("Failed to create content: {$e->getMessage()}");
         }
     }
@@ -127,29 +131,30 @@ class ContentType
 
             // Always update timestamp
             // Note: QueryBuilder doesn't support CURRENT_TIMESTAMP directly, so we use PHP
-            $updateData['updated_at'] = date('Y-m-d H:i:s');
+            $updateData['updated_at'] = now();
 
-            // Update content table
             if (!empty($updateData)) {
                 $this->db->table('content')
                     ->where('id', $id)
                     ->update($updateData);
             }
 
-            // Update meta fields
             if (isset($data['fields'])) {
-                // Delete existing meta
                 $this->db->table('content_meta')
                     ->where('content_id', $id)
                     ->delete();
-                // Insert new meta
                 $this->saveMeta($id, $data['fields']);
             }
 
             $this->db->commit();
             return true;
         } catch (\Exception $e) {
-            $this->db->rollback();
+            try {
+                $this->db->rollback();
+            } catch (\Exception $rollbackEx) {
+                // Log rollback failure but don't mask original error
+                error_log("Rollback failed: " . $rollbackEx->getMessage());
+            }
             throw new \RuntimeException("Failed to update content: {$e->getMessage()}");
         }
     }
@@ -185,7 +190,6 @@ class ContentType
             return null;
         }
 
-        // Get meta fields
         $result['fields'] = $this->getMeta($id);
 
         // Populate relationships
@@ -315,7 +319,6 @@ class ContentType
                 }
             }
 
-            // Insert meta
             $this->db->table('content_meta')->insert([
                 'content_id' => $contentId,
                 'meta_key' => $key,

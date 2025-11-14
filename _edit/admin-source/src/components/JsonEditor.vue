@@ -55,7 +55,6 @@ import * as monaco from 'monaco-editor'
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
 
-// Configure Monaco environment
 self.MonacoEnvironment = {
   getWorker(_, label) {
     if (label === 'json') {
@@ -132,7 +131,6 @@ function saveJson() {
   }
 }
 
-// Watch for external changes to modelValue
 watch(() => props.modelValue, (newValue) => {
   const newJson = JSON.stringify(newValue, null, 2)
   if (newJson !== jsonText.value && editor) {
@@ -161,7 +159,6 @@ onMounted(() => {
       tabSize: 2
     })
 
-    // Update jsonText on editor changes
     editor.onDidChangeModelContent(() => {
       jsonText.value = editor.getValue()
       validateJson()
