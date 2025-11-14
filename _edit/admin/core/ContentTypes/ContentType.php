@@ -49,9 +49,12 @@ class ContentType
             $status = $data['status'] ?? 'draft';
             $authorId = $data['author_id'] ?? null;
 
-            // Slug is required
+            // Slug is required and must be URL-safe
             if (empty($slug)) {
                 throw new \RuntimeException("Slug is required");
+            }
+            if (!preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug)) {
+                throw new \RuntimeException("Slug must contain only lowercase letters, numbers, and hyphens (no spaces or special characters)");
             }
 
             // Ensure slug uniqueness for this content type
@@ -95,6 +98,10 @@ class ContentType
                 // Slug is required and cannot be empty
                 if (empty($data['slug'])) {
                     throw new \RuntimeException("Slug is required and cannot be empty");
+                }
+                // Validate slug format
+                if (!preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $data['slug'])) {
+                    throw new \RuntimeException("Slug must contain only lowercase letters, numbers, and hyphens (no spaces or special characters)");
                 }
 
                 // Check slug uniqueness (excluding current item)
@@ -209,28 +216,7 @@ class ContentType
         }
 
         // Apply field filters using EXISTS subqueries
-        if (isset($filters['field_filters']) && !empty($filters['field_filters'])) {
-            foreach ($filters['field_filters'] as $index => $filter) {
-                $alias = "m{$index}";
-
-                // Build subquery for EXISTS clause
-                if ($filter['operator'] === 'LIKE') {
-                    $subquery = "SELECT 1 FROM content_meta {$alias} " .
-                               "WHERE {$alias}.content_id = content.id " .
-                               "AND {$alias}.meta_key = ? " .
-                               "AND {$alias}.meta_value LIKE ?";
-                    $bindings = [$filter['key'], '%' . $filter['value'] . '%'];
-                } else {
-                    $subquery = "SELECT 1 FROM content_meta {$alias} " .
-                               "WHERE {$alias}.content_id = content.id " .
-                               "AND {$alias}.meta_key = ? " .
-                               "AND {$alias}.meta_value {$filter['operator']} ?";
-                    $bindings = [$filter['key'], $filter['value']];
-                }
-
-                $query->whereExists($subquery, $bindings);
-            }
-        }
+        $this->applyFieldFilters($query, $filters);
 
         // Apply ordering
         $orderBy = $filters['order_by'] ?? 'created_at';
@@ -249,10 +235,16 @@ class ContentType
         // Execute query
         $results = $query->get();
 
-        // Populate meta and relationships for each item
-        foreach ($results as &$item) {
-            $item['fields'] = $this->getMeta((int) $item['id']);
-            $item = $this->populateRelationships($item);
+        // Batch load meta for all content items (solves N+1 query problem)
+        if (!empty($results)) {
+            $contentIds = array_column($results, 'id');
+            $allMeta = $this->getMetaBatch($contentIds);
+
+            // Populate meta and relationships for each item
+            foreach ($results as &$item) {
+                $item['fields'] = $allMeta[(int)$item['id']] ?? [];
+                $item = $this->populateRelationships($item);
+            }
         }
 
         return $results;
@@ -280,28 +272,7 @@ class ContentType
         }
 
         // Apply field filters using EXISTS subqueries
-        if (isset($filters['field_filters']) && !empty($filters['field_filters'])) {
-            foreach ($filters['field_filters'] as $index => $filter) {
-                $alias = "m{$index}";
-
-                // Build subquery for EXISTS clause
-                if ($filter['operator'] === 'LIKE') {
-                    $subquery = "SELECT 1 FROM content_meta {$alias} " .
-                               "WHERE {$alias}.content_id = content.id " .
-                               "AND {$alias}.meta_key = ? " .
-                               "AND {$alias}.meta_value LIKE ?";
-                    $bindings = [$filter['key'], '%' . $filter['value'] . '%'];
-                } else {
-                    $subquery = "SELECT 1 FROM content_meta {$alias} " .
-                               "WHERE {$alias}.content_id = content.id " .
-                               "AND {$alias}.meta_key = ? " .
-                               "AND {$alias}.meta_value {$filter['operator']} ?";
-                    $bindings = [$filter['key'], $filter['value']];
-                }
-
-                $query->whereExists($subquery, $bindings);
-            }
-        }
+        $this->applyFieldFilters($query, $filters);
 
         return $query->count();
     }
@@ -378,6 +349,54 @@ class ContentType
         }
 
         return $fields;
+    }
+
+    /**
+     * Retrieve meta fields for multiple content IDs in a single query (batch loading)
+     *
+     * @param array $contentIds Array of content IDs
+     * @return array Associative array with content_id as key and fields array as value
+     */
+    private function getMetaBatch(array $contentIds): array
+    {
+        if (empty($contentIds)) {
+            return [];
+        }
+
+        // Build IN clause for content_ids
+        $placeholders = str_repeat('?,', count($contentIds) - 1) . '?';
+        $meta = $this->db->query(
+            "SELECT content_id, meta_key, meta_value FROM content_meta WHERE content_id IN ($placeholders)",
+            $contentIds
+        );
+
+        // Group by content_id
+        $result = [];
+        foreach ($meta as $row) {
+            $contentId = (int)$row['content_id'];
+            $key = $row['meta_key'];
+            $value = $row['meta_value'];
+
+            if (!isset($result[$contentId])) {
+                $result[$contentId] = [];
+            }
+
+            if (isset($this->fieldInstances[$key])) {
+                $fieldInstance = $this->fieldInstances[$key];
+                $result[$contentId][$key] = $fieldInstance->fromDatabase($value);
+            } else {
+                $result[$contentId][$key] = $value;
+            }
+        }
+
+        // Ensure all content IDs have an entry (even if no meta)
+        foreach ($contentIds as $id) {
+            if (!isset($result[$id])) {
+                $result[$id] = [];
+            }
+        }
+
+        return $result;
     }
 
     /**
@@ -473,11 +492,44 @@ class ContentType
 
         $media = $this->db->table('media')->where('id', $mediaId)->first();
         if ($media) {
-            $media['url'] = '/_edit/uploads/' . $media['path'];
-            return $media;
+            // Use global helper function from helpers.php to add URL
+            return addMediaUrl($media);
         }
 
         return $mediaId;
+    }
+
+    /**
+     * Apply field filters to a query using EXISTS subqueries
+     *
+     * @param mixed $query QueryBuilder instance
+     * @param array $filters Filters array containing field_filters
+     * @return void
+     */
+    private function applyFieldFilters($query, array $filters): void
+    {
+        if (isset($filters['field_filters']) && !empty($filters['field_filters'])) {
+            foreach ($filters['field_filters'] as $index => $filter) {
+                $alias = "m{$index}";
+
+                // Build subquery for EXISTS clause
+                if ($filter['operator'] === 'LIKE') {
+                    $subquery = "SELECT 1 FROM content_meta {$alias} " .
+                               "WHERE {$alias}.content_id = content.id " .
+                               "AND {$alias}.meta_key = ? " .
+                               "AND {$alias}.meta_value LIKE ?";
+                    $bindings = [$filter['key'], '%' . $filter['value'] . '%'];
+                } else {
+                    $subquery = "SELECT 1 FROM content_meta {$alias} " .
+                               "WHERE {$alias}.content_id = content.id " .
+                               "AND {$alias}.meta_key = ? " .
+                               "AND {$alias}.meta_value {$filter['operator']} ?";
+                    $bindings = [$filter['key'], $filter['value']];
+                }
+
+                $query->whereExists($subquery, $bindings);
+            }
+        }
     }
 
     /**

@@ -36,7 +36,7 @@ Built files go to `_edit/admin-dist/`. Deploy the entire `_edit/` directory to p
 
 ### Database
 
-SQLite database location: `_edit/database/site.sqlite`
+SQLite database location: `_edit/data/database/site.sqlite`
 
 No migrations system - schema is created on first run by the Database class.
 
@@ -340,7 +340,7 @@ checkRateLimit($db, 'my-endpoint', $maxAttempts, $windowMinutes);
 
 **Database:**
 ```bash
-sqlite3 _edit/database/site.sqlite
+sqlite3 _edit/data/database/site.sqlite
 .tables  # List all tables
 .schema [table]  # Show table structure
 SELECT * FROM [table] LIMIT 10;  # Query data
@@ -371,7 +371,7 @@ SELECT * FROM [table] LIMIT 10;  # Query data
 ### File System
 - `_edit/config/` must be writable (for config.json updates)
 - `_edit/uploads/` must be writable (for media uploads)
-- `_edit/database/` must be writable (for SQLite database)
+- `_edit/data/database/` must be writable (for SQLite database)
 
 ## API Response Format
 

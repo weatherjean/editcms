@@ -1,9 +1,18 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useApi } from './useApi'
 
 const user = ref(null)
 const token = ref(localStorage.getItem('edit_token'))
 const isFirstTimeSetup = ref(false)
+
+// Sync token to localStorage automatically (single source of truth)
+watch(token, (newToken) => {
+  if (newToken) {
+    localStorage.setItem('edit_token', newToken)
+  } else {
+    localStorage.removeItem('edit_token')
+  }
+})
 
 export function useAuth() {
   const { apiRequest } = useApi()
@@ -11,11 +20,12 @@ export function useAuth() {
 
   async function checkFirstTimeSetup() {
     try {
-      const response = await fetch('/_edit/api/auth/has-users')
-      const data = await response.json()
-      isFirstTimeSetup.value = !data.has_users
+      const response = await apiRequest('GET', '/health')
+      isFirstTimeSetup.value = response.first_time_setup === true
+      return isFirstTimeSetup.value
     } catch (error) {
-      console.error('Failed to check first-time setup:', error)
+      console.error('Failed to check first time setup:', error)
+      return false
     }
   }
 
@@ -46,15 +56,22 @@ export function useAuth() {
   }
 
   function handleAuthSuccess(response) {
-    token.value = response.token
+    token.value = response.token  // localStorage sync happens via watch
     user.value = response.user
-    localStorage.setItem('edit_token', response.token)
   }
 
-  function logout() {
-    token.value = null
+  async function logout() {
+    // Call backend to invalidate session
+    try {
+      await apiRequest('POST', '/auth/logout')
+    } catch (error) {
+      // Ignore errors - clear local state anyway
+      console.warn('Logout API call failed:', error)
+    }
+
+    // Clear local state
+    token.value = null  // localStorage sync happens via watch
     user.value = null
-    localStorage.removeItem('edit_token')
   }
 
   return {

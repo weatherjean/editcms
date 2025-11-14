@@ -147,7 +147,13 @@ class Database
             // Add indexes for rate limit queries
             $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_ip_endpoint ON rate_limits(ip_address, endpoint)");
             $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_window ON rate_limits(window_start)");
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_locked ON rate_limits(locked_until)");
         }
+
+        // Add missing performance indexes for existing tables
+        // These are safe to run even if indexes already exist (IF NOT EXISTS)
+        $this->execute("CREATE INDEX IF NOT EXISTS idx_meta_value ON content_meta(meta_value)");
+        $this->execute("CREATE INDEX IF NOT EXISTS idx_rate_limits_locked ON rate_limits(locked_until)");
 
         // Check if sessions table exists
         $sessionsCheck = $this->query(
@@ -214,6 +220,7 @@ class Database
             // Indexes for content_meta
             $this->execute("CREATE INDEX IF NOT EXISTS idx_meta_content_id ON content_meta(content_id)");
             $this->execute("CREATE INDEX IF NOT EXISTS idx_meta_key ON content_meta(meta_key)");
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_meta_value ON content_meta(meta_value)");
 
             // Users table
             $this->execute("

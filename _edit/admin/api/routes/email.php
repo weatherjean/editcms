@@ -94,11 +94,17 @@ function handlePublicEmailRoutes(string $method, string $path, Database $db): bo
 
         $smtpConfig = null;
         if (!empty($settings['smtp_host'] ?? '')) {
+            // Decrypt password from database
+            $decryptedPassword = '';
+            if (!empty($settings['smtp_password'])) {
+                $decryptedPassword = Security::decrypt($settings['smtp_password']) ?? '';
+            }
+
             $smtpConfig = [
                 'host' => $settings['smtp_host'] ?? '',
                 'port' => $settings['smtp_port'] ?? 587,
                 'username' => $settings['smtp_username'] ?? '',
-                'password' => $settings['smtp_password'] ?? '',
+                'password' => $decryptedPassword,
                 'encryption' => $settings['smtp_encryption'] ?? 'tls'
             ];
         }
@@ -175,13 +181,16 @@ function handleEmailAdminRoutes(string $method, string $path, Database $db): boo
             'smtp_encryption'
         ]);
 
+        // Mask the password for security (don't send decrypted password to frontend)
+        $maskedPassword = !empty($settings['smtp_password']) ? '********' : '';
+
         sendJson([
             'from_email' => $settings['email_from_address'] ?? '',
             'from_name' => $settings['email_from_name'] ?? '',
             'smtp_host' => $settings['smtp_host'] ?? '',
             'smtp_port' => $settings['smtp_port'] ?? '587',
             'smtp_username' => $settings['smtp_username'] ?? '',
-            'smtp_password' => $settings['smtp_password'] ?? '',
+            'smtp_password' => $maskedPassword,
             'smtp_encryption' => $settings['smtp_encryption'] ?? 'tls'
         ]);
         return true;
@@ -212,7 +221,13 @@ function handleEmailAdminRoutes(string $method, string $path, Database $db): boo
         saveSetting($db, 'smtp_host', $data['smtp_host']);
         saveSetting($db, 'smtp_port', $data['smtp_port']);
         saveSetting($db, 'smtp_username', $data['smtp_username']);
-        saveSetting($db, 'smtp_password', $data['smtp_password']);
+
+        // Encrypt password before storing (skip if masked placeholder)
+        if ($data['smtp_password'] !== '********') {
+            $encryptedPassword = Security::encrypt($data['smtp_password']);
+            saveSetting($db, 'smtp_password', $encryptedPassword);
+        }
+
         saveSetting($db, 'smtp_encryption', $data['smtp_encryption'] ?? 'tls');
 
         sendJson([
@@ -224,7 +239,7 @@ function handleEmailAdminRoutes(string $method, string $path, Database $db): boo
 
     // Get email logs
     if ($path === '/email-logs' && $method === 'GET') {
-        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 50;
+        $limit = isset($_GET['limit']) ? min((int)$_GET['limit'], EDIT_MAX_PAGE_LIMIT) : 50;
         $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
 
         $logs = $db->table('email_logs')

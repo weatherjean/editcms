@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // Initialize services
 $db = new Database(EDIT_DATABASE_PATH);
 $auth = new Auth($db);
-$registry = new ContentTypeRegistry();
+$registry = new ContentTypeRegistry(EDIT_BASE_PATH . '/data/config');
 $registry->load();
 $blocks = new BlockRegistry(EDIT_BASE_PATH . '/data/config');
 $blocks->load();
@@ -78,6 +78,12 @@ if (!$userId) {
 // ============================================
 // AUTHENTICATED ROUTES
 // ============================================
+
+// Get current user info
+if ($path === '/auth/me' && $method === 'GET') {
+    $user = $auth->getCurrentUser();
+    sendJson(['user' => $user]);
+}
 
 require_once __DIR__ . '/routes/users.php';
 if (handleUserRoutes($method, $path, $db, $auth, $userId)) exit;

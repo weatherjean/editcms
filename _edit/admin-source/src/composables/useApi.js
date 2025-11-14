@@ -30,8 +30,39 @@ export function useApi() {
       const response = await fetch(`/_edit/api${endpoint}`, options)
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Request failed' }))
-        throw new Error(errorData.error || 'Request failed')
+        // Parse error response
+        const errorData = await response.json().catch(() => ({ error: null }))
+
+        // Provide specific error messages based on status code
+        let errorMessage = errorData.error
+        if (!errorMessage) {
+          switch (response.status) {
+            case 401:
+              errorMessage = 'Session expired. Please log in again.'
+              // Clear auth token on 401
+              localStorage.removeItem('edit_token')
+              break
+            case 403:
+              errorMessage = 'You do not have permission for this action.'
+              break
+            case 404:
+              errorMessage = 'Resource not found.'
+              break
+            case 409:
+              errorMessage = 'Conflict: The resource is in use or already exists.'
+              break
+            case 429:
+              errorMessage = 'Too many requests. Please try again later.'
+              break
+            case 500:
+              errorMessage = 'Server error. Please try again later.'
+              break
+            default:
+              errorMessage = `Request failed (${response.status})`
+          }
+        }
+
+        throw new Error(errorMessage)
       }
 
       const result = await response.json()

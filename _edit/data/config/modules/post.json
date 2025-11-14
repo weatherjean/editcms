@@ -1,0 +1,57 @@
+{
+  "post_types": [
+    {
+      "key": "post",
+      "label": "Post",
+      "label_plural": "Posts",
+      "description": "Blog posts and articles",
+      "icon": "file-text",
+      "allow_open": true
+    }
+  ],
+  "field_groups": [
+    {
+      "key": "post_content",
+      "title": "Post Content",
+      "description": "Main content fields for posts",
+      "locations": [
+        "post"
+      ],
+      "fields": [
+        {
+          "key": "excerpt",
+          "label": "Excerpt",
+          "type": "textarea",
+          "instructions": "Short summary of the post",
+          "required": false,
+          "default_value": ""
+        },
+        {
+          "key": "featured_image",
+          "label": "Featured Image",
+          "type": "media",
+          "instructions": "Main image for the post",
+          "required": false,
+          "config": {
+            "multiple": false
+          }
+        },
+        {
+          "key": "published_at",
+          "label": "Publish Date",
+          "type": "datetime",
+          "instructions": "When to publish this post",
+          "required": false
+        },
+        {
+          "key": "asdf",
+          "label": "asdf",
+          "type": "text",
+          "instructions": "",
+          "required": false,
+          "config": {}
+        }
+      ]
+    }
+  ]
+}

@@ -36,6 +36,22 @@ function getJsonBody(): ?array
 }
 
 /**
+ * Get Authorization header from request
+ * Checks both HTTP_AUTHORIZATION and apache_request_headers() fallback
+ */
+function getAuthHeader(): string
+{
+    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+
+    if (empty($authHeader) && function_exists('apache_request_headers')) {
+        $headers = apache_request_headers();
+        $authHeader = $headers['Authorization'] ?? '';
+    }
+
+    return $authHeader;
+}
+
+/**
  * Rate limiting with exponential backoff
  *
  * @param Database $db Database instance
@@ -52,7 +68,6 @@ function checkRateLimit(Database $db, string $endpoint, int $maxAttempts = 10, i
     $windowStart = date('Y-m-d H:i:s', strtotime("-{$windowMinutes} minutes"));
 
     // Clean up old rate limit records (older than 1 hour)
-    // Using raw SQL for datetime comparison
     $db->execute(
         "DELETE FROM rate_limits WHERE window_start < ? AND (locked_until IS NULL OR locked_until < ?)",
         [$oneHourAgo, $now]
@@ -70,48 +85,66 @@ function checkRateLimit(Database $db, string $endpoint, int $maxAttempts = 10, i
         $lockedUntil = new DateTime($lockCheck['locked_until']);
         $nowDt = new DateTime();
         $secondsRemaining = $lockedUntil->getTimestamp() - $nowDt->getTimestamp();
-
         sendError("Rate limit exceeded. Try again in " . ceil($secondsRemaining / 60) . " minutes.", 429);
     }
 
-    // Get current attempts within window
-    $record = $db->table('rate_limits')
-        ->select(['id', 'attempts', 'window_start'])
-        ->where('ip_address', $ipAddress)
-        ->where('endpoint', $endpoint)
-        ->where('window_start', '>', $windowStart)
-        ->first();
+    // ATOMIC OPERATION: Insert or reset window if expired
+    $db->execute(
+        "INSERT INTO rate_limits (ip_address, endpoint, attempts, window_start) VALUES (?, ?, 0, ?)
+         ON CONFLICT(ip_address, endpoint) DO UPDATE SET
+            attempts = CASE WHEN window_start <= ? THEN 0 ELSE attempts END,
+            window_start = CASE WHEN window_start <= ? THEN ? ELSE window_start END,
+            locked_until = NULL",
+        [$ipAddress, $endpoint, $now, $windowStart, $windowStart, $now]
+    );
 
-    if (!$record) {
-        // First attempt in this window - create new record
-        // Note: ON CONFLICT requires raw SQL for SQLite
-        $db->execute(
-            "INSERT INTO rate_limits (ip_address, endpoint, attempts, window_start) VALUES (?, ?, 1, ?)
-             ON CONFLICT(ip_address, endpoint) DO UPDATE SET attempts = 1, window_start = ?, locked_until = NULL",
-            [$ipAddress, $endpoint, $now, $now]
-        );
-    } else {
-        // Increment attempts
-        $currentAttempts = $record['attempts'];
+    // ATOMIC OPERATION: Increment if under limit, using WHERE clause
+    $result = $db->execute(
+        "UPDATE rate_limits
+         SET attempts = attempts + 1
+         WHERE ip_address = ? AND endpoint = ? AND attempts < ?",
+        [$ipAddress, $endpoint, $maxAttempts]
+    );
 
-        if ($currentAttempts >= $maxAttempts) {
-            // Calculate lockout duration with exponential backoff
-            // 1st violation: 1 minute, 2nd: 5 minutes, 3rd+: 15 minutes
-            $violations = floor($currentAttempts / $maxAttempts);
-            $lockoutMinutes = min(15, pow(5, min($violations, 2)));
-            $lockedUntil = date('Y-m-d H:i:s', strtotime("+{$lockoutMinutes} minutes"));
+    // If no rows updated, rate limit exceeded
+    if ($result === 0) {
+        // Get current attempts to calculate lockout
+        $record = $db->table('rate_limits')
+            ->select(['attempts'])
+            ->where('ip_address', $ipAddress)
+            ->where('endpoint', $endpoint)
+            ->first();
 
-            $db->table('rate_limits')
-                ->where('id', $record['id'])
-                ->update(['locked_until' => $lockedUntil]);
+        $currentAttempts = $record['attempts'] ?? $maxAttempts;
 
-            sendError("Rate limit exceeded. Locked out for {$lockoutMinutes} minutes.", 429);
-        } else {
-            // Increment counter
-            $db->table('rate_limits')
-                ->where('id', $record['id'])
-                ->update(['attempts' => $currentAttempts + 1]);
-        }
+        // Calculate lockout duration with exponential backoff
+        // 1st violation: 1 minute, 2nd: 5 minutes, 3rd+: 15 minutes
+        $violations = floor($currentAttempts / $maxAttempts);
+        $lockoutMinutes = min(15, pow(5, min($violations, 2)));
+        $lockedUntil = date('Y-m-d H:i:s', strtotime("+{$lockoutMinutes} minutes"));
+
+        // Set lockout
+        $db->table('rate_limits')
+            ->where('ip_address', $ipAddress)
+            ->where('endpoint', $endpoint)
+            ->update(['locked_until' => $lockedUntil]);
+
+        sendError("Rate limit exceeded. Locked out for {$lockoutMinutes} minutes.", 429);
+    }
+}
+
+/**
+ * Require HTTP method to match one of the allowed methods
+ *
+ * @param string $current Current HTTP method
+ * @param string|array $allowed Allowed method(s) - string or array of strings
+ * @return void Sends error and exits if method not allowed
+ */
+function requireMethod(string $current, string|array $allowed): void
+{
+    $allowed = is_array($allowed) ? $allowed : [$allowed];
+    if (!in_array($current, $allowed)) {
+        sendError('Method not allowed', 405);
     }
 }
 
@@ -217,4 +250,38 @@ function addMediaUrl(array|null $media): array|null
         }
         return $media;
     }
+}
+
+/**
+ * Check if media is in use across all content
+ * Handles both direct media fields and nested media in repeater/JSON fields
+ *
+ * @param Database $db Database instance
+ * @param int $mediaId Media ID to check
+ * @return bool True if media is in use
+ */
+function checkMediaUsage(Database $db, int $mediaId): bool
+{
+    // Use SQL to check for media usage - much faster than loading all records into PHP
+    // Check for:
+    // 1. Direct match: meta_value = 'mediaId'
+    // 2. JSON occurrence: meta_value contains the media ID in various JSON formats
+    //    - As number: "123" or ":123," or ":123}"
+    //    - As string: "\"123\"" (quoted string in JSON)
+
+    $count = $db->query(
+        "SELECT COUNT(*) as count FROM content_meta
+         WHERE meta_value = ?
+            OR meta_value LIKE ?
+            OR meta_value LIKE ?
+            OR meta_value LIKE ?",
+        [
+            (string)$mediaId,              // Direct match: "123"
+            '%":' . $mediaId . ',%',       // JSON number: ":123,"
+            '%":' . $mediaId . '}%',       // JSON number: ":123}"
+            '%"' . $mediaId . '"%'         // JSON string: "123" or \"123\"
+        ]
+    );
+
+    return ($count[0]['count'] ?? 0) > 0;
 }

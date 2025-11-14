@@ -17,9 +17,7 @@ function handleAuthRoutes(string $method, string $path, Auth $auth, Database $db
 {
     // Login
     if ($path === '/auth/login') {
-        if ($method !== 'POST') {
-            sendError('Method not allowed', 405);
-        }
+        requireMethod($method, 'POST');
 
         // Rate limit: 5 attempts per 15 minutes
         checkRateLimit($db, 'login', 5, 15);
@@ -38,9 +36,7 @@ function handleAuthRoutes(string $method, string $path, Auth $auth, Database $db
 
     // Register (first-time setup only)
     if ($path === '/auth/register') {
-        if ($method !== 'POST') {
-            sendError('Method not allowed', 405);
-        }
+        requireMethod($method, 'POST');
 
         // Rate limit: 3 attempts per 15 minutes
         checkRateLimit($db, 'register', 3, 15);
@@ -66,25 +62,9 @@ function handleAuthRoutes(string $method, string $path, Auth $auth, Database $db
         return true;
     }
 
-    // Get current user (requires auth)
-    if ($path === '/auth/me') {
-        $userId = $auth->verifyRequest();
-        if (!$userId) {
-            sendError('Unauthorized', 401);
-        }
-
-        $user = $auth->getCurrentUser();
-        sendJson(['user' => $user]);
-        return true;
-    }
-
     // Logout (requires auth)
     if ($path === '/auth/logout' && $method === 'POST') {
-        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-
-        if (empty($authHeader)) {
-            $authHeader = apache_request_headers()['Authorization'] ?? '';
-        }
+        $authHeader = getAuthHeader();
 
         if (empty($authHeader)) {
             sendError('No token provided', 400);

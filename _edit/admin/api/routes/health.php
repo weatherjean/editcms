@@ -79,11 +79,15 @@ function handleHealthRoutes(string $method, string $path, Database $db): bool
 
         $overall = $hasErrors ? 'error' : ($hasWarnings ? 'warning' : 'ok');
 
+        // Check if this is first-time setup (no users exist)
+        $userCount = $db->table('users')->count();
+
         sendJson([
             'status' => $overall,
             'checks' => $checks,
             'message' => $hasErrors ? 'System has errors that need attention' :
-                         ($hasWarnings ? 'System is functional but has warnings' : 'All systems operational')
+                         ($hasWarnings ? 'System is functional but has warnings' : 'All systems operational'),
+            'first_time_setup' => $userCount === 0
         ]);
         return true;
     }

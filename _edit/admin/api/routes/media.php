@@ -100,13 +100,9 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
         }
 
         if ($method === 'DELETE' && $mediaId) {
-            // Check if media is in use before deleting
-            $usage = $db->table('content_meta')
-                ->where('meta_value', (string)$mediaId)
-                ->first();
-
-            if ($usage) {
-                sendError('Media is currently in use and cannot be deleted', 400);
+            // Check if media is in use before deleting (handles JSON fields too)
+            if (checkMediaUsage($db, $mediaId)) {
+                sendError('Media is currently in use and cannot be deleted', 409);
             }
 
             // Delete media file and database record

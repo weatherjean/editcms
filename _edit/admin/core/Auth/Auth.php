@@ -142,13 +142,7 @@ class Auth
      */
     public function verifyRequest(): ?int
     {
-        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-
-        if (empty($authHeader)) {
-            // Also check for alternative header
-            $authHeader = apache_request_headers()['Authorization'] ?? '';
-        }
-
+        $authHeader = getAuthHeader();
         return $this->verifyToken($authHeader);
     }
 
