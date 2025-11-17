@@ -27,18 +27,27 @@ Access the admin at: http://localhost:5173/_edit/admin/
 
 ### Building for Production
 
-**ALWAYS use the build script:**
+**CRITICAL: ALWAYS use the build script. NEVER run `npm run build` directly unless explicitly asked by the user.**
 
 ```bash
 ./build.sh
 ```
 
-This builds the complete distribution package including:
+**DO NOT USE:**
+- ❌ `npm run build`
+- ❌ `cd _edit/admin-source && npm run build`
+- ❌ Any direct Vite build commands
+
+**ONLY USE:**
+- ✅ `./build.sh` (from repository root)
+
+The build script handles the complete distribution package including:
 - Vue admin interface compiled to `_edit/admin/`
 - PHP backend (core, admin-api, api)
 - All .htaccess files with integrity hashes
 - Complete directory structure ready for deployment
 - Output: `dist/_edit-dev.zip` (production-ready archive)
+- Proper cleanup to prevent asset accumulation
 
 ### Database
 

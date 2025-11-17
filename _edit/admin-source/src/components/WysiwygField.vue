@@ -53,8 +53,10 @@ import Quill from 'quill'
 import 'quill/dist/quill.snow.css'
 import MediaModal from './MediaModal.vue'
 import { useMedia } from '../composables/useMedia'
+import { useToast } from '../composables/useToast'
 
 const { fetchMedia, uploadFile } = useMedia()
+const { error: showError } = useToast()
 
 const props = defineProps({
   modelValue: {
@@ -161,7 +163,7 @@ async function handleMediaUpload(file) {
     }
   } catch (err) {
     console.error('Failed to upload media:', err)
-    alert('Failed to upload image: ' + err.message)
+    showError('Failed to upload image: ' + err.message)
   }
 }
 watch(() => props.modelValue, (newValue) => {

@@ -104,7 +104,7 @@
         </button>
         <div class="dropdown dropdown-end">
           <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar">
-            <div class="w-10 rounded-full bg-neutral text-neutral-content">
+            <div class="w-10 rounded-full bg-primary text-primary-content">
               <span class="flex items-center justify-center h-full text-sm">{{ getUserInitials(user) }}</span>
             </div>
           </div>

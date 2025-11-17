@@ -82,6 +82,7 @@
 import { ref, computed } from 'vue'
 import FieldBuilder from './FieldBuilder.vue'
 import { useApi } from '../composables/useApi'
+import { useToast } from '../composables/useToast'
 
 const props = defineProps({
   availablePostTypes: {
@@ -93,6 +94,7 @@ const props = defineProps({
 const emit = defineEmits(['saved'])
 
 const { apiRequest } = useApi()
+const { error: showError } = useToast()
 
 const dialogRef = ref(null)
 const form = ref({
@@ -136,7 +138,7 @@ function close() {
 async function save() {
   try {
     if (!form.value.key || !form.value.label || form.value.fields.length === 0) {
-      alert('Please fill in required fields and add at least one field')
+      showError('Please fill in required fields and add at least one field')
       return
     }
 
@@ -163,7 +165,7 @@ async function save() {
     emit('saved')
     close()
   } catch (error) {
-    alert('Failed to save: ' + error.message)
+    showError('Failed to save: ' + error.message)
   }
 }
 

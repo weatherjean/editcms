@@ -17,33 +17,27 @@
                 type="button"
                 @click="moveBlock(index, -1)"
                 :disabled="index === 0"
-                class="btn btn-ghost btn-sm join-item"
-                title="Move Up"
+                class="btn btn-ghost btn-sm join-item tooltip tooltip-left"
+                data-tip="Move Up"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" />
-                </svg>
+                <IconChevronUp />
               </button>
               <button
                 type="button"
                 @click="moveBlock(index, 1)"
                 :disabled="index === modelValue.length - 1"
-                class="btn btn-ghost btn-sm join-item"
-                title="Move Down"
+                class="btn btn-ghost btn-sm join-item tooltip tooltip-left"
+                data-tip="Move Down"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                </svg>
+                <IconChevronDown />
               </button>
               <button
                 type="button"
                 @click="removeBlock(index)"
-                class="btn btn-error btn-ghost btn-sm join-item"
-                title="Remove Block"
+                class="btn btn-ghost btn-error btn-sm join-item tooltip tooltip-left"
+                data-tip="Remove Block"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                </svg>
+                <IconTrash />
               </button>
             </div>
           </div>
@@ -110,6 +104,9 @@
 <script setup>
 import FieldRenderer from './FieldRenderer.vue'
 import RepeaterField from './RepeaterField.vue'
+import IconChevronUp from './icons/IconChevronUp.vue'
+import IconChevronDown from './icons/IconChevronDown.vue'
+import IconTrash from './icons/IconTrash.vue'
 
 const props = defineProps({
   modelValue: {

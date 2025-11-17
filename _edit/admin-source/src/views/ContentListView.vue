@@ -42,8 +42,12 @@
               </td>
               <td class="text-right">
                 <div class="join">
-                  <button @click="editContent(item.id)" class="btn btn-neutral join-item">Edit</button>
-                  <button @click="deleteContent(item.id)" class="btn btn-error join-item">Delete</button>
+                  <button @click="editContent(item.id)" class="btn btn-ghost btn-sm join-item tooltip tooltip-left" data-tip="Edit">
+                    <IconEdit />
+                  </button>
+                  <button @click="deleteContent(item.id)" class="btn btn-ghost btn-error btn-sm join-item tooltip tooltip-left" data-tip="Delete">
+                    <IconTrash />
+                  </button>
                 </div>
               </td>
             </tr>
@@ -72,6 +76,8 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useApi } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
+import IconEdit from '../components/icons/IconEdit.vue'
+import IconTrash from '../components/icons/IconTrash.vue'
 import { useConfirm } from '../composables/useConfirm'
 import { useDate } from '../composables/useDate'
 

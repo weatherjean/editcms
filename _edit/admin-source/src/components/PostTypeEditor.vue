@@ -104,21 +104,24 @@
                 <div class="card-body">
                   <div class="flex items-center justify-between mb-3">
                     <h5 class="font-semibold">{{ group.title || 'Untitled Field Group' }}</h5>
-                    <div class="flex gap-1">
+                    <div class="join">
                       <button
                         type="button"
                         @click="editingGroupIndex = editingGroupIndex === groupIndex ? null : groupIndex"
-                        class="btn btn-ghost"
+                        class="btn btn-ghost btn-sm join-item tooltip tooltip-left"
                         :class="{ 'btn-active': editingGroupIndex === groupIndex }"
+                        :data-tip="editingGroupIndex === groupIndex ? 'Collapse' : 'Expand'"
                       >
-                        {{ editingGroupIndex === groupIndex ? 'Collapse' : 'Expand' }}
+                        <IconChevronUp v-if="editingGroupIndex === groupIndex" />
+                        <IconChevronDown v-else />
                       </button>
                       <button
                         type="button"
                         @click="removeFieldGroup(groupIndex)"
-                        class="btn btn-error btn-ghost"
+                        class="btn btn-ghost btn-error btn-sm join-item tooltip tooltip-left"
+                        data-tip="Remove"
                       >
-                        Remove
+                        <IconTrash />
                       </button>
                     </div>
                   </div>
@@ -195,6 +198,11 @@
 import { ref, computed } from 'vue'
 import FieldBuilder from './FieldBuilder.vue'
 import { useApi } from '../composables/useApi'
+import { useToast } from '../composables/useToast'
+import { useConfirm } from '../composables/useConfirm'
+import IconChevronUp from './icons/IconChevronUp.vue'
+import IconChevronDown from './icons/IconChevronDown.vue'
+import IconTrash from './icons/IconTrash.vue'
 
 const props = defineProps({
   allPostTypes: {
@@ -206,6 +214,8 @@ const props = defineProps({
 const emit = defineEmits(['saved'])
 
 const { apiRequest } = useApi()
+const { error: showError } = useToast()
+const { confirm: confirmDialog } = useConfirm()
 
 const dialogRef = ref(null)
 const form = ref({
@@ -269,8 +279,13 @@ function addFieldGroup() {
   editingGroupIndex.value = form.value.field_groups.length - 1
 }
 
-function removeFieldGroup(index) {
-  if (confirm('Remove this field group?')) {
+async function removeFieldGroup(index) {
+  const confirmed = await confirmDialog('Are you sure you want to remove this field group?', {
+    title: 'Remove Field Group',
+    variant: 'warning'
+  })
+
+  if (confirmed) {
     form.value.field_groups.splice(index, 1)
     if (editingGroupIndex.value === index) {
       editingGroupIndex.value = null
@@ -281,7 +296,7 @@ function removeFieldGroup(index) {
 async function save() {
   try {
     if (!form.value.key || !form.value.label || !form.value.label_plural) {
-      alert('Please fill in required fields')
+      showError('Please fill in required fields')
       return
     }
 
@@ -328,7 +343,7 @@ async function save() {
     emit('saved')
     close()
   } catch (error) {
-    alert('Failed to save: ' + error.message)
+    showError('Failed to save: ' + error.message)
   }
 }
 

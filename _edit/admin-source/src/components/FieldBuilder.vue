@@ -10,41 +10,41 @@
               <span class="badge badge-sm">{{ field.type || 'unknown' }}</span>
               <span class="font-semibold">{{ field.label || field.key || 'Untitled Field' }}</span>
             </div>
-            <div class="flex gap-1">
+            <div class="join">
               <button
                 type="button"
                 @click="moveField(index, -1)"
                 :disabled="index === 0"
-                class="btn btn-ghost"
-                title="Move Up"
+                class="btn btn-ghost btn-sm join-item tooltip tooltip-left"
+                data-tip="Move Up"
               >
-                Up
+                <IconChevronUp />
               </button>
               <button
                 type="button"
                 @click="moveField(index, 1)"
                 :disabled="index === fields.length - 1"
-                class="btn btn-ghost"
-                title="Move Down"
+                class="btn btn-ghost btn-sm join-item tooltip tooltip-left"
+                data-tip="Move Down"
               >
-                Down
+                <IconChevronDown />
               </button>
               <button
                 type="button"
                 @click="editingIndex = editingIndex === index ? null : index"
-                class="btn btn-ghost"
+                class="btn btn-ghost btn-sm join-item tooltip tooltip-left"
                 :class="{ 'btn-active': editingIndex === index }"
-                title="Edit"
+                data-tip="Edit"
               >
-                Edit
+                <IconEdit />
               </button>
               <button
                 type="button"
                 @click="removeField(index)"
-                class="btn btn-error btn-ghost"
-                title="Remove"
+                class="btn btn-ghost btn-error btn-sm join-item tooltip tooltip-left"
+                data-tip="Remove"
               >
-                Delete
+                <IconTrash />
               </button>
             </div>
           </div>
@@ -185,6 +185,13 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { useConfirm } from '../composables/useConfirm'
+import IconChevronUp from './icons/IconChevronUp.vue'
+import IconChevronDown from './icons/IconChevronDown.vue'
+import IconEdit from './icons/IconEdit.vue'
+import IconTrash from './icons/IconTrash.vue'
+
+const { confirm: confirmDialog } = useConfirm()
 
 const props = defineProps({
   modelValue: {
@@ -233,8 +240,13 @@ function addField() {
   editingIndex.value = fields.value.length - 1
 }
 
-function removeField(index) {
-  if (confirm('Remove this field?')) {
+async function removeField(index) {
+  const confirmed = await confirmDialog('Are you sure you want to remove this field?', {
+    title: 'Remove Field',
+    variant: 'warning'
+  })
+
+  if (confirmed) {
     fields.value.splice(index, 1)
     if (editingIndex.value === index) {
       editingIndex.value = null

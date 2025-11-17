@@ -70,9 +70,15 @@
                   </td>
                   <td class="text-right">
                     <div class="join">
-                      <button @click="editPostType(module)" class="btn btn-ghost join-item">Edit</button>
-                      <button @click="downloadFile('modules', module.file.name)" class="btn btn-ghost join-item">Download</button>
-                      <button @click="confirmDelete('modules', module.file)" class="btn btn-ghost btn-error join-item">Delete</button>
+                      <button @click="editPostType(module)" class="btn btn-ghost btn-sm join-item tooltip tooltip-left" data-tip="Edit">
+                        <IconEdit />
+                      </button>
+                      <button @click="downloadFile('modules', module.file.name)" class="btn btn-ghost btn-sm join-item tooltip tooltip-left" data-tip="Download">
+                        <IconDownload />
+                      </button>
+                      <button @click="confirmDelete('modules', module.file)" class="btn btn-ghost btn-error btn-sm join-item tooltip tooltip-left" data-tip="Delete">
+                        <IconTrash />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -125,9 +131,15 @@
                   </td>
                   <td class="text-right">
                     <div class="join">
-                      <button @click="editFieldGroup(fg)" class="btn btn-ghost join-item">Edit</button>
-                      <button @click="downloadFile('field-groups', fg.file.name)" class="btn btn-ghost join-item">Download</button>
-                      <button @click="confirmDelete('field-groups', fg.file)" class="btn btn-ghost btn-error join-item">Delete</button>
+                      <button @click="editFieldGroup(fg)" class="btn btn-ghost btn-sm join-item tooltip tooltip-left" data-tip="Edit">
+                        <IconEdit />
+                      </button>
+                      <button @click="downloadFile('field-groups', fg.file.name)" class="btn btn-ghost btn-sm join-item tooltip tooltip-left" data-tip="Download">
+                        <IconDownload />
+                      </button>
+                      <button @click="confirmDelete('field-groups', fg.file)" class="btn btn-ghost btn-error btn-sm join-item tooltip tooltip-left" data-tip="Delete">
+                        <IconTrash />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -179,9 +191,15 @@
                   </td>
                   <td class="text-right">
                     <div class="join">
-                      <button @click="editBlock(block)" class="btn btn-ghost join-item">Edit</button>
-                      <button @click="downloadFile('blocks', block.file.name)" class="btn btn-ghost join-item">Download</button>
-                      <button @click="confirmDelete('blocks', block.file)" class="btn btn-ghost btn-error join-item">Delete</button>
+                      <button @click="editBlock(block)" class="btn btn-ghost btn-sm join-item tooltip tooltip-left" data-tip="Edit">
+                        <IconEdit />
+                      </button>
+                      <button @click="downloadFile('blocks', block.file.name)" class="btn btn-ghost btn-sm join-item tooltip tooltip-left" data-tip="Download">
+                        <IconDownload />
+                      </button>
+                      <button @click="confirmDelete('blocks', block.file)" class="btn btn-ghost btn-error btn-sm join-item tooltip tooltip-left" data-tip="Delete">
+                        <IconTrash />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -230,6 +248,9 @@ import CardSection from '../components/CardSection.vue'
 import PostTypeEditor from '../components/PostTypeEditor.vue'
 import FieldGroupEditor from '../components/FieldGroupEditor.vue'
 import BlockEditor from '../components/BlockEditor.vue'
+import IconEdit from '../components/icons/IconEdit.vue'
+import IconDownload from '../components/icons/IconDownload.vue'
+import IconTrash from '../components/icons/IconTrash.vue'
 
 const { apiRequest } = useApi()
 const { success: showSuccess, error: showError } = useToast()

@@ -13,8 +13,12 @@
             <div class="font-mono text-sm">{{ mediaValue.filename }}</div>
           </div>
           <div class="join">
-            <button type="button" @click="$emit('select')" class="btn btn-sm btn-ghost join-item">Change</button>
-            <button type="button" @click="$emit('remove')" class="btn btn-sm btn-ghost join-item">Remove</button>
+            <button type="button" @click="$emit('select')" class="btn btn-sm btn-ghost join-item tooltip tooltip-left" data-tip="Change">
+              <IconEdit />
+            </button>
+            <button type="button" @click="$emit('remove')" class="btn btn-sm btn-ghost btn-error join-item tooltip tooltip-left" data-tip="Remove">
+              <IconTrash />
+            </button>
           </div>
         </div>
       </div>
@@ -32,6 +36,8 @@
 
 <script setup>
 import { computed } from 'vue'
+import IconEdit from './icons/IconEdit.vue'
+import IconTrash from './icons/IconTrash.vue'
 
 const props = defineProps({
   modelValue: {
