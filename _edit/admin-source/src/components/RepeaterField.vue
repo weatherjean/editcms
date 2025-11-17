@@ -1,5 +1,11 @@
 <template>
   <div class="space-y-4">
+    <!-- Repeater Label -->
+    <div v-if="label">
+      <div class="fieldset-legend">{{ label }}</div>
+      <p v-if="instructions" class="opacity-60 mb-2">{{ instructions }}</p>
+    </div>
+
     <!-- Repeater Items -->
     <div v-for="(item, index) in items" :key="index" class="card bg-base-200 border">
       <div class="card-body p-4">
@@ -20,27 +26,28 @@
 
         <!-- Sub-fields -->
         <div class="space-y-4">
-          <fieldset v-for="subField in fields" :key="subField.key" class="fieldset">
-            <legend class="fieldset-legend">{{ subField.label }}</legend>
+          <div v-for="subField in fields" :key="subField.key">
+            <!-- Media Field - special handling for size -->
+            <fieldset v-if="subField.type === 'media'" class="fieldset">
+              <legend class="fieldset-legend">{{ subField.label }}</legend>
+              <MediaField
+                :model-value="item[subField.key]"
+                size="small"
+                @select="$emit('selectMedia', subField.key, item)"
+                @remove="item[subField.key] = null"
+              />
+            </fieldset>
 
-            <!-- Text -->
-            <input v-if="subField.type === 'text'" type="text" v-model="item[subField.key]" class="input w-full">
-
-            <!-- Textarea -->
-            <textarea v-else-if="subField.type === 'textarea'" v-model="item[subField.key]" rows="3" class="textarea w-full"></textarea>
-
-            <!-- Number -->
-            <input v-else-if="subField.type === 'number'" type="number" v-model="item[subField.key]" class="input w-full">
-
-            <!-- Media -->
-            <MediaField
-              v-else-if="subField.type === 'media'"
-              :model-value="item[subField.key]"
-              size="small"
-              @select="$emit('selectMedia', subField.key, item)"
-              @remove="item[subField.key] = null"
+            <!-- All Other Fields -->
+            <FieldRenderer
+              v-else
+              :field="subField"
+              v-model="item[subField.key]"
+              :relationship-items="relationshipData[subField.config?.post_type]"
+              @selectMedia="$emit('selectMedia', subField.key, item)"
+              @loadRelationship="(postType) => $emit('loadRelationship', postType)"
             />
-          </fieldset>
+          </div>
         </div>
       </div>
     </div>
@@ -57,10 +64,14 @@
 
 <script setup>
 import { computed } from 'vue'
+import FieldRenderer from './FieldRenderer.vue'
 import MediaField from './MediaField.vue'
 import IconChevronUp from './icons/IconChevronUp.vue'
 import IconChevronDown from './icons/IconChevronDown.vue'
 import IconTrash from './icons/IconTrash.vue'
+import { useConfirm } from '../composables/useConfirm'
+
+const { confirm: confirmDialog } = useConfirm()
 
 const props = defineProps({
   modelValue: {
@@ -70,10 +81,22 @@ const props = defineProps({
   fields: {
     type: Array,
     default: () => []
+  },
+  relationshipData: {
+    type: Object,
+    default: () => ({})
+  },
+  label: {
+    type: String,
+    default: ''
+  },
+  instructions: {
+    type: String,
+    default: ''
   }
 })
 
-const emit = defineEmits(['update:modelValue', 'selectMedia'])
+const emit = defineEmits(['update:modelValue', 'selectMedia', 'loadRelationship'])
 
 const items = computed({
   get: () => props.modelValue || [],
@@ -88,7 +111,15 @@ function addItem() {
   items.value = [...items.value, newItem]
 }
 
-function removeItem(index) {
+async function removeItem(index) {
+  const confirmed = await confirmDialog('Are you sure you want to delete this item?', {
+    title: 'Delete Item',
+    variant: 'error',
+    confirmText: 'Delete'
+  })
+
+  if (!confirmed) return
+
   items.value = items.value.filter((_, i) => i !== index)
 }
 

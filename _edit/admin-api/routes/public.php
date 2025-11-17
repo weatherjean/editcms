@@ -149,9 +149,11 @@ function parsePublicQueryParams(array $query, array $contentTypeConfig): array
 
     // Build list of valid field keys from schema
     $validFieldKeys = [];
-    foreach ($contentTypeConfig['field_groups'] as $group) {
-        foreach ($group['fields'] as $field) {
-            $validFieldKeys[] = $field['key'];
+    if (isset($contentTypeConfig['field_groups'])) {
+        foreach ($contentTypeConfig['field_groups'] as $group) {
+            foreach ($group['fields'] as $field) {
+                $validFieldKeys[] = $field['key'];
+            }
         }
     }
 
@@ -230,15 +232,17 @@ function applyFieldSelection(array $item, ContentTypeRegistry $registry, array $
     $fieldGroupKeys = [];
     $allDefinedFields = [];
 
-    foreach ($contentTypeConfig['field_groups'] as $group) {
-        $fieldGroupKeys[] = $group['key'];
-        foreach ($group['fields'] as $field) {
-            $allDefinedFields[] = $field['key'];
+    if (isset($contentTypeConfig['field_groups'])) {
+        foreach ($contentTypeConfig['field_groups'] as $group) {
+            $fieldGroupKeys[] = $group['key'];
+            foreach ($group['fields'] as $field) {
+                $allDefinedFields[] = $field['key'];
+            }
         }
     }
 
     // Apply field_groups filter
-    if (isset($query['field_groups'])) {
+    if (isset($query['field_groups']) && isset($contentTypeConfig['field_groups'])) {
         $requestedGroups = array_map('trim', explode(',', $query['field_groups']));
         $allowedFields = [];
 
@@ -275,7 +279,7 @@ function applyFieldSelection(array $item, ContentTypeRegistry $registry, array $
 }
 
 /**
- * Populate relationship fields
+ * Populate relationship fields (including nested in flexible content and repeaters)
  */
 function populateRelationships(array $item, ContentType $contentType, ContentTypeRegistry $registry, string $populateParam): array
 {
@@ -286,36 +290,112 @@ function populateRelationships(array $item, ContentType $contentType, ContentTyp
     $fieldsToPopulate = array_map('trim', explode(',', $populateParam));
     $db = $contentType->getDatabase();
 
+    // Populate top-level fields
     foreach ($fieldsToPopulate as $fieldKey) {
-        if (!isset($item['fields'][$fieldKey])) {
-            continue;
-        }
-
-        $value = $item['fields'][$fieldKey];
-
-        // Handle both single relationships and arrays
-        if (is_array($value)) {
-            // Multiple relationships
-            $populated = [];
-            foreach ($value as $relatedId) {
-                if (is_numeric($relatedId)) {
-                    $related = fetchRelatedContent($db, $registry, (int) $relatedId);
-                    if ($related) {
-                        $populated[] = $related;
-                    }
-                }
-            }
-            $item['fields'][$fieldKey] = $populated;
-        } elseif (is_numeric($value)) {
-            // Single relationship
-            $related = fetchRelatedContent($db, $registry, (int) $value);
-            if ($related) {
-                $item['fields'][$fieldKey] = $related;
-            }
+        if (isset($item['fields'][$fieldKey])) {
+            $item['fields'][$fieldKey] = populateFieldValue($item['fields'][$fieldKey], $db, $registry);
         }
     }
 
+    // Recursively populate relationships inside flexible_content blocks
+    if (isset($item['fields']['flexible_content']) && is_array($item['fields']['flexible_content'])) {
+        $item['fields']['flexible_content'] = populateFlexibleContent(
+            $item['fields']['flexible_content'],
+            $fieldsToPopulate,
+            $db,
+            $registry
+        );
+    }
+
     return $item;
+}
+
+/**
+ * Populate relationships in flexible content blocks
+ */
+function populateFlexibleContent(array $blocks, array $fieldsToPopulate, Database $db, ContentTypeRegistry $registry): array
+{
+    error_log("populateFlexibleContent called with " . count($blocks) . " blocks");
+    error_log("Fields to populate: " . json_encode($fieldsToPopulate));
+
+    $populated = [];
+    foreach ($blocks as $block) {
+        error_log("Processing block: " . ($block['block_type'] ?? 'unknown'));
+        if (isset($block['fields']) && is_array($block['fields'])) {
+            error_log("Block fields before: " . json_encode($block['fields']));
+            $block['fields'] = populateNestedFields($block['fields'], $fieldsToPopulate, $db, $registry);
+            error_log("Block fields after: " . json_encode($block['fields']));
+        }
+        $populated[] = $block;
+    }
+    return $populated;
+}
+
+/**
+ * Recursively populate fields in nested structures (repeaters, etc.)
+ */
+function populateNestedFields(array $fields, array $fieldsToPopulate, Database $db, ContentTypeRegistry $registry): array
+{
+    error_log("populateNestedFields called with keys: " . json_encode(array_keys($fields)));
+
+    $populated = [];
+    foreach ($fields as $key => $value) {
+        error_log("Processing field: $key, value type: " . gettype($value));
+
+        // Check if this field should be populated
+        if (in_array($key, $fieldsToPopulate)) {
+            error_log("Field $key matches populate list! Value: " . json_encode($value));
+            $populated[$key] = populateFieldValue($value, $db, $registry);
+            error_log("Field $key after populate: " . json_encode($populated[$key]));
+        }
+        // Recursively handle arrays (repeaters)
+        elseif (is_array($value) && !empty($value)) {
+            // Check if it's a numeric array (repeater items)
+            if (array_keys($value) === range(0, count($value) - 1)) {
+                error_log("Field $key is a numeric array (repeater)");
+                $populatedArray = [];
+                foreach ($value as $item) {
+                    if (is_array($item)) {
+                        $populatedArray[] = populateNestedFields($item, $fieldsToPopulate, $db, $registry);
+                    } else {
+                        $populatedArray[] = $item;
+                    }
+                }
+                $populated[$key] = $populatedArray;
+            } else {
+                error_log("Field $key is an associative array, not populating");
+                $populated[$key] = $value;
+            }
+        } else {
+            $populated[$key] = $value;
+        }
+    }
+    return $populated;
+}
+
+/**
+ * Populate a single field value (handles both single and multiple relationships)
+ */
+function populateFieldValue($value, Database $db, ContentTypeRegistry $registry)
+{
+    if (is_array($value)) {
+        // Array of relationships
+        $populated = [];
+        foreach ($value as $relatedId) {
+            if (is_numeric($relatedId)) {
+                $related = fetchRelatedContent($db, $registry, (int) $relatedId);
+                if ($related) {
+                    $populated[] = $related;
+                }
+            }
+        }
+        return $populated;
+    } elseif (is_numeric($value)) {
+        // Single relationship
+        $related = fetchRelatedContent($db, $registry, (int) $value);
+        return $related ?: $value;
+    }
+    return $value;
 }
 
 /**

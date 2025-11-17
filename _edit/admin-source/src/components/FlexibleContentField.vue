@@ -59,7 +59,11 @@
                 v-if="field.type === 'repeater' && item.fields"
                 v-model="item.fields[field.key]"
                 :fields="field.config?.fields || []"
+                :relationship-data="relationshipData"
+                :label="field.label"
+                :instructions="field.instructions"
                 @selectMedia="(subFieldKey, subItem) => $emit('selectMedia', subFieldKey, subItem)"
+                @loadRelationship="(postType) => $emit('loadRelationship', postType)"
               />
 
               <!-- All Other Fields -->
@@ -67,7 +71,9 @@
                 v-else-if="item.fields"
                 :field="field"
                 v-model="item.fields[field.key]"
+                :relationship-items="relationshipData[field.config?.post_type]"
                 @selectMedia="(fieldKey) => $emit('selectMedia', fieldKey, item.fields)"
+                @loadRelationship="(postType) => $emit('loadRelationship', postType)"
               />
             </div>
           </div>
@@ -116,10 +122,14 @@ const props = defineProps({
   availableBlocks: {
     type: Array,
     default: () => []
+  },
+  relationshipData: {
+    type: Object,
+    default: () => ({})
   }
 })
 
-const emit = defineEmits(['update:modelValue', 'selectMedia'])
+const emit = defineEmits(['update:modelValue', 'selectMedia', 'loadRelationship'])
 
 function getBlock(blockType) {
   return props.availableBlocks.find(b => b.key === blockType)

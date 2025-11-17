@@ -1,5 +1,5 @@
 <template>
-  <dialog :open="isOpen" class="modal" :class="{ 'modal-open': isOpen }">
+  <dialog ref="dialogRef" class="modal">
     <div class="modal-box">
       <h3 class="font-bold text-lg mb-4">{{ title }}</h3>
       <p class="py-4">{{ message }}</p>
@@ -23,8 +23,10 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, watch, ref } from 'vue'
 import { useConfirm } from '../composables/useConfirm'
+
+const dialogRef = ref(null)
 
 const {
   isOpen,
@@ -36,6 +38,15 @@ const {
   handleConfirm,
   handleCancel
 } = useConfirm()
+
+// Watch for isOpen changes and use native dialog API
+watch(isOpen, (newValue) => {
+  if (newValue) {
+    dialogRef.value?.showModal()
+  } else {
+    dialogRef.value?.close()
+  }
+})
 
 const buttonClass = computed(() => {
   switch (confirmVariant.value) {

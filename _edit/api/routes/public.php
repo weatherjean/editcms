@@ -294,6 +294,7 @@ function populateRelationships(array $item, ContentType $contentType, ContentTyp
     $fieldsToPopulate = array_map('trim', explode(',', $populateParam));
     $db = $contentType->getDatabase();
 
+    // Populate top-level fields (existing logic)
     foreach ($fieldsToPopulate as $fieldKey) {
         if (!isset($item['fields'][$fieldKey])) {
             continue;
@@ -323,7 +324,64 @@ function populateRelationships(array $item, ContentType $contentType, ContentTyp
         }
     }
 
+    // Populate relationships inside flexible_content blocks
+    if (isset($item['fields']['flexible_content']) && is_array($item['fields']['flexible_content'])) {
+        foreach ($item['fields']['flexible_content'] as &$block) {
+            if (isset($block['fields']) && is_array($block['fields'])) {
+                $block['fields'] = populateNestedRelationships($block['fields'], $fieldsToPopulate, $db, $registry);
+            }
+        }
+    }
+
     return $item;
+}
+
+/**
+ * Recursively populate relationship fields in nested structures (blocks, repeaters)
+ */
+function populateNestedRelationships(array $fields, array $fieldsToPopulate, Database $db, ContentTypeRegistry $registry): array
+{
+    foreach ($fields as $key => $value) {
+        // If this field name matches the populate list and it's a relationship ID
+        if (in_array($key, $fieldsToPopulate)) {
+            if (is_numeric($value)) {
+                // Single relationship
+                $related = fetchRelatedContent($db, $registry, (int) $value);
+                if ($related) {
+                    $fields[$key] = $related;
+                }
+            } elseif (is_array($value)) {
+                // Array of relationship IDs
+                $populated = [];
+                foreach ($value as $relatedId) {
+                    if (is_numeric($relatedId)) {
+                        $related = fetchRelatedContent($db, $registry, (int) $relatedId);
+                        if ($related) {
+                            $populated[] = $related;
+                        }
+                    }
+                }
+                if (!empty($populated)) {
+                    $fields[$key] = $populated;
+                }
+            }
+        }
+        // Recursively handle arrays (repeaters)
+        elseif (is_array($value) && !empty($value)) {
+            // Check if it's a numeric array (list of items)
+            $isNumericArray = array_keys($value) === range(0, count($value) - 1);
+            if ($isNumericArray) {
+                // It's a repeater - process each item
+                foreach ($value as $index => $item) {
+                    if (is_array($item)) {
+                        $fields[$key][$index] = populateNestedRelationships($item, $fieldsToPopulate, $db, $registry);
+                    }
+                }
+            }
+        }
+    }
+
+    return $fields;
 }
 
 /**

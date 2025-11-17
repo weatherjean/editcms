@@ -27,7 +27,11 @@
               v-if="field.type === 'repeater'"
               v-model="form.fields[field.key]"
               :fields="field.config?.fields || []"
+              :relationship-data="relationshipData"
+              :label="field.label"
+              :instructions="field.instructions"
               @selectMedia="(subFieldKey, item) => openMediaModal(subFieldKey, item)"
+              @loadRelationship="loadRelationshipItems"
             />
 
             <!-- All Other Fields -->
@@ -55,7 +59,9 @@
           <FlexibleContentField
             v-model="form.fields.flexible_content"
             :available-blocks="availableBlocks"
+            :relationship-data="relationshipData"
             @selectMedia="(subFieldKey, item) => openMediaModal(subFieldKey, item)"
+            @loadRelationship="loadRelationshipItems"
           />
         </CardSection>
 
@@ -136,11 +142,28 @@ const currentPostType = computed(() => {
 })
 
 const assignedFieldGroups = computed(() => {
-  if (!currentType.value || !props.fieldGroups) return []
+  console.log('Computing assignedFieldGroups...')
+  console.log('  currentType:', currentType.value)
+  console.log('  All available field groups:', props.fieldGroups?.map(fg => ({
+    key: fg.key,
+    title: fg.title,
+    locations: fg.locations,
+    fields: fg.fields?.map(f => ({ key: f.key, type: f.type, config: f.config }))
+  })))
 
-  return props.fieldGroups.filter(fg => {
-    return fg.locations && fg.locations.includes(currentType.value)
+  if (!currentType.value || !props.fieldGroups) {
+    console.log('  Returning empty - missing currentType or fieldGroups')
+    return []
+  }
+
+  const filtered = props.fieldGroups.filter(fg => {
+    const hasLocation = fg.locations && fg.locations.includes(currentType.value)
+    console.log(`  Field group ${fg.key}: locations=${fg.locations}, includes ${currentType.value}? ${hasLocation}`)
+    return hasLocation
   })
+
+  console.log('  Filtered result:', filtered)
+  return filtered
 })
 
 async function loadContentItem() {
@@ -175,6 +198,9 @@ async function loadContentItem() {
 
     // Load media items
     await loadMedia()
+
+    // Preload relationship data for fields that have values
+    await preloadRelationships()
   } catch (error) {
     console.error('Failed to load content item:', error)
   }
@@ -199,6 +225,7 @@ async function resetForm() {
   }
 
   await loadMedia()
+  await preloadRelationships()
 }
 
 async function saveContent() {
@@ -303,15 +330,87 @@ async function uploadMediaFile(file) {
 async function loadRelationshipItems(postType) {
   if (!postType) return
 
-  if (relationshipData.value[postType]) return
+  if (relationshipData.value[postType]) {
+    console.log(`Relationship items for ${postType} already loaded:`, relationshipData.value[postType])
+    return
+  }
 
   try {
+    console.log(`Loading relationship items for: ${postType}`)
     const items = await apiRequest('GET', `/${postType}`)
+    console.log(`Loaded ${items.length} items for ${postType}:`, items)
     relationshipData.value[postType] = items
   } catch (error) {
     console.error(`Failed to load ${postType}:`, error)
     relationshipData.value[postType] = []
   }
+}
+
+async function preloadRelationships() {
+  // Find all relationship fields
+  const relationshipFieldsToLoad = new Set()
+
+  console.log('Current post type:', currentType.value)
+  console.log('Assigned field groups:', assignedFieldGroups.value)
+  console.log('Available blocks:', availableBlocks.value)
+
+  // Check field groups for relationship fields
+  assignedFieldGroups.value.forEach(group => {
+    console.log('Processing field group:', group.key, 'with fields:', group.fields)
+    group.fields?.forEach(field => {
+      console.log('Field:', field.key, 'Type:', field.type, 'Config:', field.config)
+      if (field.type === 'relationship' && field.config?.post_type) {
+        console.log('Adding relationship field for post type:', field.config.post_type)
+        relationshipFieldsToLoad.add(field.config.post_type)
+      }
+      // Check for relationship fields inside repeaters
+      if (field.type === 'repeater' && field.config?.fields) {
+        console.log('Field group has repeater field, checking sub-fields...')
+        field.config.fields.forEach(subField => {
+          console.log('Repeater sub-field:', subField.key, 'Type:', subField.type, 'Config:', subField.config)
+          if (subField.type === 'relationship' && subField.config?.post_type) {
+            console.log('Adding relationship field from repeater for post type:', subField.config.post_type)
+            relationshipFieldsToLoad.add(subField.config.post_type)
+          }
+        })
+      }
+    })
+  })
+
+  // Check blocks for relationship fields (for flexible content)
+  if (currentPostType.value?.allow_open) {
+    console.log('Post type allows flexible content, checking blocks...')
+    availableBlocks.value.forEach(block => {
+      console.log('Processing block:', block.key, 'with fields:', block.fields)
+      block.fields?.forEach(field => {
+        console.log('Block field:', field.key, 'Type:', field.type, 'Config:', field.config)
+        if (field.type === 'relationship' && field.config?.post_type) {
+          console.log('Adding relationship field from block for post type:', field.config.post_type)
+          relationshipFieldsToLoad.add(field.config.post_type)
+        }
+        // Check for relationship fields inside repeaters
+        if (field.type === 'repeater' && field.config?.fields) {
+          console.log('Block has repeater field, checking sub-fields...')
+          field.config.fields.forEach(subField => {
+            console.log('Repeater sub-field:', subField.key, 'Type:', subField.type, 'Config:', subField.config)
+            if (subField.type === 'relationship' && subField.config?.post_type) {
+              console.log('Adding relationship field from repeater for post type:', subField.config.post_type)
+              relationshipFieldsToLoad.add(subField.config.post_type)
+            }
+          })
+        }
+      })
+    })
+  }
+
+  console.log('Preloading relationships for:', Array.from(relationshipFieldsToLoad))
+
+  // Load all relationship data in parallel
+  await Promise.all(
+    Array.from(relationshipFieldsToLoad).map(postType => loadRelationshipItems(postType))
+  )
+
+  console.log('Relationship data loaded:', relationshipData.value)
 }
 async function loadBlocks() {
   try {

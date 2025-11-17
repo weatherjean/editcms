@@ -9,32 +9,19 @@
 
       <form @submit.prevent="save" class="space-y-4">
         <!-- Basic Info -->
-        <div class="grid grid-cols-2 gap-4">
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Key *</legend>
-            <input
-              type="text"
-              v-model="form.key"
-              :disabled="isEditing"
-              class="input w-full"
-              placeholder="hero_section"
-              pattern="[a-z0-9_]+"
-              required
-            >
-            <p class="opacity-60 mt-1">Lowercase with underscores only</p>
-          </fieldset>
-
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Icon</legend>
-            <input
-              type="text"
-              v-model="form.icon"
-              class="input w-full"
-              placeholder=""
-              maxlength="2"
-            >
-          </fieldset>
-        </div>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Key *</legend>
+          <input
+            type="text"
+            v-model="form.key"
+            :disabled="isEditing"
+            class="input w-full"
+            placeholder="hero_section"
+            pattern="[a-z0-9_]+"
+            required
+          >
+          <p class="opacity-60 mt-1">Lowercase with underscores only</p>
+        </fieldset>
 
         <fieldset class="fieldset">
           <legend class="fieldset-legend">Label *</legend>
@@ -101,7 +88,6 @@ const form = ref({
   key: '',
   label: '',
   description: '',
-  icon: '',
   fields: []
 })
 const originalKey = ref(null)
@@ -114,7 +100,6 @@ function open(block = null) {
       key: block.key,
       label: block.label,
       description: block.description || '',
-      icon: block.icon || '',
       fields: JSON.parse(JSON.stringify(block.fields || []))
     }
     originalKey.value = block.key
@@ -123,7 +108,6 @@ function open(block = null) {
       key: '',
       label: '',
       description: '',
-      icon: '',
       fields: []
     }
     originalKey.value = null
@@ -132,6 +116,13 @@ function open(block = null) {
 }
 
 function close() {
+  form.value = {
+    key: '',
+    label: '',
+    description: '',
+    fields: []
+  }
+  originalKey.value = null
   dialogRef.value?.close()
 }
 

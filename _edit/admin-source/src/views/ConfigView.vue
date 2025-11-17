@@ -178,12 +178,9 @@
               <tbody>
                 <tr v-for="block in blocks" :key="block.file.filename">
                   <td>
-                    <div class="flex items-center gap-2">
-                      <span class="text-2xl">{{ block.data.icon }}</span>
-                      <div>
-                        <div class="font-semibold">{{ block.data.label || 'Unknown' }}</div>
-                        <div class="font-mono opacity-60">{{ block.data.key }}</div>
-                      </div>
+                    <div>
+                      <div class="font-semibold">{{ block.data.label || 'Unknown' }}</div>
+                      <div class="font-mono opacity-60">{{ block.data.key }}</div>
                     </div>
                   </td>
                   <td>

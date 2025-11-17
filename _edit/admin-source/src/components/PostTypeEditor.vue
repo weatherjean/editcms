@@ -61,25 +61,13 @@
               ></textarea>
             </fieldset>
 
-            <div class="grid grid-cols-2 gap-4">
-              <fieldset class="fieldset">
-                <legend class="fieldset-legend">Icon</legend>
-                <input
-                  type="text"
-                  v-model="form.icon"
-                  class="input w-full"
-                  placeholder="file-text"
-                >
-              </fieldset>
-
-              <fieldset class="fieldset">
-                <legend class="fieldset-legend">Options</legend>
-                <label class="label cursor-pointer justify-start gap-4">
-                  <input type="checkbox" v-model="form.allow_open" class="toggle">
-                  <span class="label-text">Allow Flexible Content (Blocks)</span>
-                </label>
-              </fieldset>
-            </div>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">Options</legend>
+              <label class="label cursor-pointer justify-start gap-4">
+                <input type="checkbox" v-model="form.allow_open" class="toggle">
+                <span class="label-text">Allow Flexible Content (Blocks)</span>
+              </label>
+            </fieldset>
           </div>
         </div>
 
@@ -223,7 +211,6 @@ const form = ref({
   label: '',
   label_plural: '',
   description: '',
-  icon: '',
   allow_open: false,
   field_groups: []
 })
@@ -240,7 +227,6 @@ function open(module = null) {
       label: postType.label,
       label_plural: postType.label_plural,
       description: postType.description || '',
-      icon: postType.icon || '',
       allow_open: postType.allow_open || false,
       field_groups: JSON.parse(JSON.stringify(module.field_groups || []))
     }
@@ -254,7 +240,6 @@ function open(module = null) {
       label: '',
       label_plural: '',
       description: '',
-      icon: '',
       allow_open: false,
       field_groups: []
     }
@@ -307,7 +292,6 @@ async function save() {
           label: form.value.label,
           label_plural: form.value.label_plural,
           description: form.value.description,
-          icon: form.value.icon,
           allow_open: form.value.allow_open
         }
       ],
