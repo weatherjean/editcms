@@ -80,7 +80,7 @@ export function useMedia() {
       })
 
       // Send request
-      xhr.open('POST', '/_edit/api/media')
+      xhr.open('POST', '/_edit/admin-api/media')
       xhr.setRequestHeader('Authorization', `Bearer ${token}`)
       xhr.send(formData)
     })

@@ -30,7 +30,7 @@ export function useApi() {
     }
 
     try {
-      const response = await fetch(`/_edit/api${endpoint}`, options)
+      const response = await fetch(`/_edit/admin-api${endpoint}`, options)
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: null }))

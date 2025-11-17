@@ -32,26 +32,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-// Initialize services
+// Parse request early for health checks
+$method = $_SERVER['REQUEST_METHOD'];
+$path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+$path = str_replace('/_edit/admin-api', '', $path);
+$path = rtrim($path, '/');
+
+// Initialize basic services for health checks
 $db = new Database(EDIT_DATABASE_PATH);
+
+// ============================================
+// HEALTH CHECK (before heavy initialization)
+// ============================================
+
+require_once __DIR__ . '/routes/health.php';
+if (handleHealthRoutes($method, $path, $db)) exit;
+
+// Initialize remaining services
 $auth = new Auth($db);
 $registry = new ContentTypeRegistry(EDIT_BASE_PATH . '/data/config');
 $registry->load();
 $blocks = new BlockRegistry(EDIT_BASE_PATH . '/data/config');
 $blocks->load();
 
-// Parse request
-$method = $_SERVER['REQUEST_METHOD'];
-$path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$path = str_replace('/_edit/api', '', $path);
-$path = rtrim($path, '/');
-
 // ============================================
 // PUBLIC ROUTES (no auth required)
 // ============================================
-
-require_once __DIR__ . '/routes/health.php';
-if (handleHealthRoutes($method, $path, $db)) exit;
 
 require_once __DIR__ . '/routes/public.php';
 if (handlePublicRoutes($method, $path, $db, $registry, $blocks)) exit;

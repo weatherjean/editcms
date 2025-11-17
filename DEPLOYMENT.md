@@ -1,34 +1,31 @@
-# Installation Guide
+# Deployment Guide
 
-## Quick Start
+## Installation
 
-1. **Extract** the `_edit` folder to your website directory
-2. **Visit** `https://yourdomain.com/_edit/admin/`
-3. **Register** your admin account (first user only)
-4. **Done!**
+1. Extract the `_edit` folder to your website root
+2. Visit `https://yourdomain.com/_edit/admin/`
+3. Create your admin account (first user only)
 
-That's it. The CMS automatically creates all necessary directories and sets up the database.
-
----
+The system automatically creates all necessary directories and database on first run.
 
 ## Requirements
 
-- **PHP 8.1+** with extensions: SQLite3, PDO, JSON, fileinfo
-- **Apache with mod_rewrite** OR **Nginx** (configuration included)
+- PHP 8.1+ with extensions: SQLite3, PDO, JSON, fileinfo
+- Apache with mod_rewrite enabled OR Nginx
 
-Most shared hosting providers (cPanel, Plesk, etc.) already meet these requirements.
-
----
+Most shared hosting (cPanel, Plesk) meets these requirements by default.
 
 ## Server Configuration
 
-### Apache (Most Common)
-**Works automatically.** The included `.htaccess` file handles all routing.
+### Apache
 
-If you get 404 errors, ask your hosting provider to enable `mod_rewrite`.
+Works automatically. The included `.htaccess` files handle all routing.
+
+If you get 404 errors, contact your hosting provider to enable mod_rewrite.
 
 ### Nginx
-Include the configuration in your server block:
+
+Add this to your server block:
 
 ```nginx
 server {
@@ -40,111 +37,68 @@ server {
 }
 ```
 
-Edit `_edit/nginx.conf` and adjust this line if needed:
-```nginx
-set $php_fpm unix:/var/run/php/php-fpm.sock;
-```
+Then reload: `nginx -s reload`
 
-Reload nginx: `nginx -s reload`
+## Email Setup (Optional)
 
----
-
-## First-Time Setup
-
-### 1. Create Admin Account
-Visit `/_edit/admin/` and register the first user.
-
-**Important:** Registration automatically closes after the first account is created. Add more users through the Users page in the admin.
-
-### 2. Configure Email (Optional)
-Go to **Email** in the admin menu and configure SMTP:
+Go to Email in the admin menu to configure SMTP.
 
 Common providers:
-- **Gmail**: `smtp.gmail.com:587` (TLS) - Requires App Password
-- **SendGrid**: `smtp.sendgrid.net:587` (TLS)
-- **Mailgun**: `smtp.mailgun.org:587` (TLS)
-
-Use the "Send Test Email" button to verify it works.
-
----
+- Gmail: smtp.gmail.com:587 (TLS, requires App Password)
+- SendGrid: smtp.sendgrid.net:587 (TLS)
+- Mailgun: smtp.mailgun.org:587 (TLS)
 
 ## Troubleshooting
 
 ### 500 Error on First Load
-The web server can't create directories. Using cPanel or FTP, create these folders manually:
+
+Create these folders manually via FTP/cPanel:
 ```
-_edit/database/
+_edit/data/database/
 _edit/uploads/
-_edit/config/
 ```
 
-### 404 Errors on Admin/API
-**Apache users**: Your host may not allow `.htaccess` files. Contact support to enable `AllowOverride All`.
+### 404 Errors on Admin
 
-**Nginx users**: Make sure you included `_edit/nginx.conf` in your server block.
+Apache: Contact hosting to enable AllowOverride All for .htaccess
+Nginx: Verify you included _edit/nginx.conf in server block
 
-### Can't Upload Media
-The `uploads/` directory isn't writable. Using cPanel File Manager:
-1. Navigate to `_edit/uploads/`
-2. Right-click → Change Permissions
-3. Set to **755** (rwxr-xr-x)
+### Cannot Upload Media
 
-### Upload File Size Limits
-By default, _edit supports uploads up to **50MB** (configured in `.user.ini`).
-
-**If you get "file too large" errors:**
-
-Most shared hosting automatically reads the `.user.ini` file, but if not:
-
-**cPanel/Plesk**: Look for "PHP Options" or "Select PHP Version" in your control panel and adjust:
-- `upload_max_filesize` → 50M (or higher)
-- `post_max_size` → 50M (or higher)
-
-**VPS/Dedicated Server**: Edit your `php.ini`:
-```ini
-upload_max_filesize = 50M
-post_max_size = 50M
-memory_limit = 256M
+Set uploads directory permissions to 755:
+```bash
+chmod 755 _edit/uploads/
 ```
 
-**Nginx Users**: Also add to your server block:
-```nginx
-client_max_body_size 50M;
-```
+Or via cPanel File Manager: Right-click uploads > Change Permissions > 755
 
-**To change the application limit**, edit `_edit/admin/core/Security/Security.php`:
-```php
-const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
-```
+### File Upload Size Limits
 
-**Important:** `MAX_FILE_SIZE` must be ≤ `upload_max_filesize` ≤ `post_max_size`
+Default limit is 50MB (configured in .user.ini).
 
-### Registration Says "Disabled"
-A user already exists. Log in with the existing account and create more users via the Users page.
+To increase:
+- cPanel/Plesk: PHP Options > upload_max_filesize and post_max_size
+- VPS: Edit php.ini and set both values
+- Nginx: Add `client_max_body_size 50M;` to server block
 
----
+### Registration Disabled
 
-## Security Features
+A user already exists. Log in and create more users via the Users page.
 
-✅ **Auto-Protected Directories**: `/database/`, `/config/`, `/core/` return 403 errors
-✅ **Rate Limiting**: Login and email endpoints have exponential backoff
-✅ **Session Authentication**: Secure tokens auto-generated and stored in database sessions table
-✅ **Registration Lock**: Automatically disables after first user is created
+## System Status
 
----
+Visit `/_edit/api/health` to check system configuration and requirements.
 
 ## Updating
 
-1. **Backup** your `data/database/`, `uploads/`, and `data/config/` folders
-2. **Replace** `admin/core/`, `admin/api/`, and `admin/dist/` with new versions
-3. **Keep** your `data/database/`, `uploads/`, and `data/config/` folders unchanged
+1. Backup: data/database/, uploads/, and data/config/
+2. Replace: admin/, admin-api/, api/, and core/ folders
+3. Keep: Your data/database/, uploads/, and data/config/ unchanged
 
-Database migrations run automatically on the first request after updating.
+## Security
 
----
-
-## Need Help?
-
-**Check the system status**: Visit `/_edit/api/health` in your browser to see if everything is configured correctly.
-
-**Common issues**: Most problems are web server configuration (mod_rewrite, PHP version, file permissions). Contact your hosting provider for assistance.
+- Protected directories: /data/, /core/ return 403
+- Rate limiting on login and email endpoints
+- Session-based authentication
+- Registration auto-locks after first user
+- File upload validation and type restrictions

@@ -10,12 +10,16 @@ export default defineConfig({
   ],
   base: '/_edit/admin/',
   build: {
-    outDir: '../admin/dist',
-    emptyOutDir: true
+    outDir: '../admin',  // Build to _edit/admin/
+    emptyOutDir: true    // Safe to empty - only contains built files
   },
   server: {
     port: 5173,
     proxy: {
+      '/_edit/admin-api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
+      },
       '/_edit/api': {
         target: 'http://localhost:8000',
         changeOrigin: true

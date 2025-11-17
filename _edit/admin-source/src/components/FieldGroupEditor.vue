@@ -161,7 +161,7 @@ async function save() {
     formData.append('file', file)
 
     const token = localStorage.getItem('edit_token')
-    const response = await fetch('/_edit/api/config/field-groups', {
+    const response = await fetch('/_edit/admin-api/config/field-groups', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`

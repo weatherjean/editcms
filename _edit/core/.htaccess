@@ -1,0 +1,3 @@
+# core/.htaccess - Deny all access to PHP source code
+
+Require all denied

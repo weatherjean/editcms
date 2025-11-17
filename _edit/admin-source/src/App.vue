@@ -16,7 +16,7 @@
           <p class="text-center opacity-60">Headless CMS Admin</p>
 
           <!-- Login Form -->
-          <form v-if="!showRegister" @submit.prevent="handleLogin" class="space-y-4">
+          <form v-if="!showRegister && !isFirstTimeSetup" @submit.prevent="handleLogin" class="space-y-4">
             <fieldset class="fieldset">
               <legend class="fieldset-legend">Email</legend>
               <input type="email" v-model="loginForm.email" required class="input w-full" placeholder="you@example.com" />
@@ -209,6 +209,11 @@ async function handleLogin() {
   try {
     await login(loginForm.value.email, loginForm.value.password)
     loginForm.value = { email: '', password: '' }
+    showRegister.value = false
+
+    // Replace history to prevent going back to login/register screen
+    window.history.replaceState({}, '', window.location.href)
+
     await init()
   } catch (error) {
     authError.value = error.message || 'Login failed'
@@ -220,6 +225,11 @@ async function handleRegister() {
   try {
     await register(registerForm.value.name, registerForm.value.email, registerForm.value.password)
     registerForm.value = { name: '', email: '', password: '' }
+    showRegister.value = false
+
+    // Replace history to prevent going back to register screen
+    window.history.replaceState({}, '', window.location.href)
+
     await init()
   } catch (error) {
     authError.value = error.message || 'Registration failed'

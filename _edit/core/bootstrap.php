@@ -7,8 +7,8 @@ declare(strict_types=1);
  * Sets up autoloading and basic configuration
  */
 
-// Define base path - points to _edit/ root (parent of admin/)
-define('EDIT_BASE_PATH', dirname(__DIR__, 2));
+// Define base path - points to _edit/ root
+define('EDIT_BASE_PATH', dirname(__DIR__));
 
 // Load configuration
 $configFile = EDIT_BASE_PATH . '/config.php';
@@ -82,7 +82,7 @@ if (EDIT_ENCRYPTION_KEY === 'CHANGE_THIS_IN_PRODUCTION_USE_RANDOM_32_BYTE_HEX_ST
 spl_autoload_register(function ($class) {
     // Namespace mappings
     $prefixes = [
-        'Edit\\Core\\' => EDIT_BASE_PATH . '/admin/core/',
+        'Edit\\Core\\' => EDIT_BASE_PATH . '/core/',
     ];
 
     // Check each prefix

@@ -35,7 +35,16 @@ $file_path = __DIR__ . '/_edit' . $file_uri;
 
 if (preg_match('#^/_edit/api/#', $uri)) {
     $_SERVER['REQUEST_URI'] = $uri;
-    require __DIR__ . '/_edit/admin/api/index.php';
+    require __DIR__ . '/_edit/api/index.php';
+    exit;
+}
+
+// For _edit root (Vue app), serve from Vite dev server during development
+if (preg_match('#^/_edit(/|$)#', $uri) && !preg_match('#^/_edit/(api|uploads|data)/#', $uri)) {
+    // In dev, Vite serves the Vue app
+    echo "<!-- Dev mode: Vite should be serving this at http://localhost:5173 -->\n";
+    echo "<!-- Make sure to access via http://localhost:5173/_edit/ -->\n";
+    http_response_code(404);
     exit;
 }
 

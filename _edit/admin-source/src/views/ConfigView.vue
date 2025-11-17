@@ -278,7 +278,7 @@ async function loadConfig() {
 
 async function loadJsonFile(type, name) {
   try {
-    const response = await fetch(`/_edit/api/config/${type}/${name}`, {
+    const response = await fetch(`/_edit/admin-api/config/${type}/${name}`, {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('edit_token')}`
       }
@@ -322,7 +322,7 @@ function editBlock(block) {
 }
 async function downloadFile(type, name) {
   try {
-    const response = await fetch(`/_edit/api/config/${type}/${name}`, {
+    const response = await fetch(`/_edit/admin-api/config/${type}/${name}`, {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('edit_token')}`
       }
@@ -345,7 +345,7 @@ async function downloadFile(type, name) {
 
 async function exportAll() {
   try {
-    const response = await fetch('/_edit/api/config/export', {
+    const response = await fetch('/_edit/admin-api/config/export', {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('edit_token')}`
       }

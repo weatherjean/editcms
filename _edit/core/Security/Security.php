@@ -270,8 +270,8 @@ class Security
     public static function validatePassword(string $password): array
     {
         // Minimum length
-        if (strlen($password) < 12) {
-            return ['valid' => false, 'error' => 'Password must be at least 12 characters long'];
+        if (strlen($password) < 8) {
+            return ['valid' => false, 'error' => 'Password must be at least 8 characters long'];
         }
 
         // Maximum length (prevent DoS via bcrypt)

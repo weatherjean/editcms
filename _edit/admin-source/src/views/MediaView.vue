@@ -16,7 +16,23 @@
         </svg>
         {{ uploading ? 'Uploading...' : 'Upload' }}
       </button>
-      <input ref="fileInput" type="file" @change="handleUpload" class="hidden" :disabled="uploading">
+      <input ref="fileInput" type="file" @change="handleUpload" class="hidden" :disabled="uploading" :accept="acceptedFileTypes">
+    </div>
+
+    <!-- Allowed File Types Info -->
+    <div class="alert">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <div class="text-sm">
+        <div class="font-semibold mb-1">Allowed file types:</div>
+        <div class="opacity-80">
+          <strong>Images:</strong> JPG, PNG, GIF, WebP, SVG &nbsp;|&nbsp;
+          <strong>Documents:</strong> PDF, Word, Excel &nbsp;|&nbsp;
+          <strong>Video:</strong> MP4, WebM, OGG &nbsp;|&nbsp;
+          <strong>Audio:</strong> MP3, OGG, WAV
+        </div>
+      </div>
     </div>
 
     <!-- Upload Progress Bar -->
@@ -49,14 +65,34 @@
           <tbody>
             <tr v-for="item in mediaItems" :key="item.id" class="hover">
               <td>
-                <div class="avatar">
+                <!-- Image Preview -->
+                <div v-if="isImage(item)" class="avatar">
                   <div class="size-24 rounded">
                     <img :src="item.url" :alt="item.filename" class="object-cover">
                   </div>
                 </div>
+                <!-- Video Preview -->
+                <div v-else-if="isVideo(item)" class="flex items-center justify-center size-24 rounded bg-base-200">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="size-12 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <!-- Audio Preview -->
+                <div v-else-if="isAudio(item)" class="flex items-center justify-center size-24 rounded bg-base-200">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="size-12 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                  </svg>
+                </div>
+                <!-- Document Preview -->
+                <div v-else class="flex items-center justify-center size-24 rounded bg-base-200">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="size-12 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                </div>
               </td>
               <td>
-                <div class="font-mono">{{ item.filename }}</div>
+                <div class="font-mono text-sm">{{ item.filename }}</div>
+                <div class="text-xs opacity-60 mt-1">{{ getFileTypeLabel(item) }}</div>
               </td>
               <td>
                 <div class="font-mono opacity-60 max-w-xs truncate" :title="item.url">
@@ -117,6 +153,39 @@ const { confirm: confirmDialog } = useConfirm()
 const { fetchMedia, uploadFile: uploadMediaFile, uploading, uploadProgress } = useMedia()
 
 const mediaItems = ref([])
+
+// Accepted file types for input field
+const acceptedFileTypes = [
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+  'application/pdf',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'video/mp4', 'video/webm', 'video/ogg',
+  'audio/mpeg', 'audio/ogg', 'audio/wav'
+].join(',')
+
+// File type detection helpers
+function isImage(item) {
+  return item.mime_type?.startsWith('image/')
+}
+
+function isVideo(item) {
+  return item.mime_type?.startsWith('video/')
+}
+
+function isAudio(item) {
+  return item.mime_type?.startsWith('audio/')
+}
+
+function getFileTypeLabel(item) {
+  if (isImage(item)) return 'Image'
+  if (isVideo(item)) return 'Video'
+  if (isAudio(item)) return 'Audio'
+  if (item.mime_type === 'application/pdf') return 'PDF Document'
+  if (item.mime_type?.includes('word')) return 'Word Document'
+  if (item.mime_type?.includes('excel') || item.mime_type?.includes('spreadsheet')) return 'Excel Spreadsheet'
+  return 'Document'
+}
 
 async function loadMedia() {
   try {

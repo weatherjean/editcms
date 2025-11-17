@@ -1,0 +1,24 @@
+# BEGIN Admin API
+
+# Block direct access to all PHP files except index.php
+<FilesMatch "\.php$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+</FilesMatch>
+<FilesMatch "^index\.php$">
+    <IfModule mod_authz_core.c>
+        Require all granted
+    </IfModule>
+</FilesMatch>
+
+# Route all requests through index.php
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteBase /_edit/admin-api/
+RewriteRule ^index\.php$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /_edit/admin-api/index.php [L]
+</IfModule>
+# END Admin API

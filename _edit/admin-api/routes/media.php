@@ -44,7 +44,7 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
 
         $uploadDir = EDIT_BASE_PATH . '/uploads/' . date('Y/m');
         if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0750, true);
+            mkdir($uploadDir, 0755, true);
         }
 
         $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
@@ -54,6 +54,9 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
         if (!move_uploaded_file($file['tmp_name'], $uploadPath)) {
             sendError('Failed to save file', 500);
         }
+
+        // Ensure file is readable by web server
+        chmod($uploadPath, 0644);
 
         $relativePath = date('Y/m') . '/' . $filename;
         $mediaId = $db->table('media')->insert([

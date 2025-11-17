@@ -11,47 +11,54 @@ echo ""
 # Get version from user or use default
 VERSION=${1:-"dev"}
 OUTPUT_DIR="dist"
-OUTPUT_FILE="${OUTPUT_DIR}/_edit-${VERSION}.tar.gz"
+OUTPUT_FILE="${OUTPUT_DIR}/_edit-${VERSION}.zip"
 
-# Step 1: Build Vue frontend
-echo "📦 Building Vue frontend..."
-cd _edit/admin-source
-npm install --silent
-npm run build
-cd ../..
-echo "✓ Frontend built"
-echo ""
-
-# Step 2: Prepare distribution directory
-echo "🗂️  Preparing distribution files..."
+# Step 1: Build distribution directory
+echo "📦 Preparing distribution..."
 TEMP_DIR=$(mktemp -d)
 DIST_ROOT="${TEMP_DIR}/_edit"
 
 # Create directory structure
-mkdir -p "${DIST_ROOT}/admin/core"
-mkdir -p "${DIST_ROOT}/admin/api"
-mkdir -p "${DIST_ROOT}/admin/dist"
+mkdir -p "${DIST_ROOT}"
 mkdir -p "${DIST_ROOT}/data/database"
 mkdir -p "${DIST_ROOT}/data/config/modules"
 mkdir -p "${DIST_ROOT}/data/config/field-groups"
 mkdir -p "${DIST_ROOT}/data/config/blocks"
 mkdir -p "${DIST_ROOT}/uploads"
 
-# Copy admin files
-echo "  → Copying admin/core/..."
-cp -r _edit/admin/core/* "${DIST_ROOT}/admin/core/"
+# Step 2: Build Vue frontend into admin/
+echo "📦 Building Vue frontend..."
+cd _edit/admin-source
 
-echo "  → Copying admin/api/..."
-cp -r _edit/admin/api/* "${DIST_ROOT}/admin/api/"
+npm install --silent
+npx vite build --outDir "${DIST_ROOT}/admin"
 
-echo "  → Copying admin/dist/..."
-cp -r _edit/admin/dist/* "${DIST_ROOT}/admin/dist/"
+cd ../..
+
+# Copy PUBLIC-API.md to admin directory
+cp _edit/admin/PUBLIC-API.md "${DIST_ROOT}/admin/"
+
+# Step 3: Copy PHP backend
+echo "  → Copying PHP backend (core, admin-api, api)..."
+cp -r _edit/core "${DIST_ROOT}/"
+cp -r _edit/admin-api "${DIST_ROOT}/"
+cp -r _edit/api "${DIST_ROOT}/"
+
+# Step 4: Copy .htaccess files
+echo "  → Copying .htaccess files..."
+cp _edit/admin/.htaccess "${DIST_ROOT}/admin/"
+cp _edit/admin-api/.htaccess "${DIST_ROOT}/admin-api/"
+cp _edit/api/.htaccess "${DIST_ROOT}/api/"
+cp _edit/core/.htaccess "${DIST_ROOT}/core/"
+cp _edit/data/.htaccess "${DIST_ROOT}/data/"
+cp _edit/uploads/.htaccess "${DIST_ROOT}/uploads/"
 
 # Copy root files
-echo "  → Copying configuration files..."
+echo "  → Copying root files..."
+cp _edit/index.html "${DIST_ROOT}/"
 cp _edit/.htaccess "${DIST_ROOT}/"
+cp _edit/.user.ini "${DIST_ROOT}/"
 cp _edit/nginx.conf "${DIST_ROOT}/"
-cp DEPLOYMENT.md "${DIST_ROOT}/"
 
 # Create .gitkeep files for empty directories
 touch "${DIST_ROOT}/uploads/.gitkeep"
@@ -81,7 +88,7 @@ ORIGINAL_DIR=$(pwd)
 mkdir -p "${ORIGINAL_DIR}/${OUTPUT_DIR}"
 
 cd "${TEMP_DIR}"
-tar -czf "${ORIGINAL_DIR}/${OUTPUT_FILE}" _edit
+zip -r -q "${ORIGINAL_DIR}/${OUTPUT_FILE}" _edit
 cd "${ORIGINAL_DIR}"
 
 # Cleanup
@@ -99,10 +106,13 @@ echo "   File: ${OUTPUT_FILE}"
 echo "   Size: ${FILE_SIZE}"
 echo ""
 echo "Distribution includes:"
-echo "  • admin/ folder (PHP backend + built frontend)"
-echo "  • data/ folder (empty, ready for user data)"
-echo "  • uploads/ folder (empty, ready for media)"
-echo "  • .htaccess, nginx.conf, DEPLOYMENT.md"
+echo "  • admin/ - Vue SPA admin interface"
+echo "  • admin-api/ - Admin API (requires auth)"
+echo "  • api/ - Public API (no auth required)"
+echo "  • core/ - Shared PHP classes"
+echo "  • data/ - User data (protected)"
+echo "  • uploads/ - Media files (public)"
+echo "  • .htaccess files in each directory"
 echo ""
 echo "Ready to deploy! 🚀"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

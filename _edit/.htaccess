@@ -1,40 +1,4 @@
-# Enable rewriting
-RewriteEngine On
-RewriteBase /_edit
+# _edit/.htaccess - Root directory
 
-# Protect sensitive directories
-RewriteRule ^data/ - [F,L]
-RewriteRule ^admin/(core|api)/ - [F,L]
-
-# Protect sensitive files
-<FilesMatch "(\.sqlite|\.txt|\.log|\.env)$">
-    Order Allow,Deny
-    Deny from all
-</FilesMatch>
-
-# API routes - route to admin/api/index.php
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^api/(.*)$ admin/api/index.php [QSA,L]
-
-# Admin routes - serve admin files from admin/dist/
-RewriteCond %{REQUEST_URI} ^/_edit/admin/
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^admin/(.*)$ admin/dist/index.html [L]
-
-# Allow uploads directory
-RewriteCond %{REQUEST_URI} ^/_edit/uploads/
-RewriteRule ^uploads/ - [L]
-
-# Default route - redirect to admin
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^$ index.php [L]
-
-# Security headers
-<IfModule mod_headers.c>
-    Header set X-Content-Type-Options "nosniff"
-    Header set X-Frame-Options "SAMEORIGIN"
-    Header set X-XSS-Protection "1; mode=block"
-</IfModule>
+# Serve files and directories directly
+# No rewrites needed - everything has its own folder
