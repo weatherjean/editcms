@@ -60,6 +60,30 @@ cp _edit/.htaccess "${DIST_ROOT}/"
 cp _edit/.user.ini "${DIST_ROOT}/"
 cp _edit/nginx.conf "${DIST_ROOT}/"
 
+# Step 4.5: Generate .htaccess integrity hashes and inject into health.php
+echo "  → Generating .htaccess integrity hashes..."
+HASH_ROOT=$(sha256sum "${DIST_ROOT}/.htaccess" | cut -d' ' -f1)
+HASH_ADMIN=$(sha256sum "${DIST_ROOT}/admin/.htaccess" | cut -d' ' -f1)
+HASH_ADMIN_API=$(sha256sum "${DIST_ROOT}/admin-api/.htaccess" | cut -d' ' -f1)
+HASH_API=$(sha256sum "${DIST_ROOT}/api/.htaccess" | cut -d' ' -f1)
+HASH_CORE=$(sha256sum "${DIST_ROOT}/core/.htaccess" | cut -d' ' -f1)
+HASH_DATA=$(sha256sum "${DIST_ROOT}/data/.htaccess" | cut -d' ' -f1)
+HASH_UPLOADS=$(sha256sum "${DIST_ROOT}/uploads/.htaccess" | cut -d' ' -f1)
+
+# Replace placeholders in health.php
+sed -i.bak \
+  -e "s/{{HASH_ROOT}}/${HASH_ROOT}/g" \
+  -e "s/{{HASH_ADMIN}}/${HASH_ADMIN}/g" \
+  -e "s/{{HASH_ADMIN_API}}/${HASH_ADMIN_API}/g" \
+  -e "s/{{HASH_API}}/${HASH_API}/g" \
+  -e "s/{{HASH_CORE}}/${HASH_CORE}/g" \
+  -e "s/{{HASH_DATA}}/${HASH_DATA}/g" \
+  -e "s/{{HASH_UPLOADS}}/${HASH_UPLOADS}/g" \
+  "${DIST_ROOT}/api/routes/health.php"
+
+# Remove backup file created by sed
+rm -f "${DIST_ROOT}/api/routes/health.php.bak"
+
 # Create .gitkeep files for empty directories
 touch "${DIST_ROOT}/uploads/.gitkeep"
 touch "${DIST_ROOT}/data/database/.gitkeep"

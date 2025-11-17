@@ -22,6 +22,80 @@ function handleHealthRoutes(string $method, string $path, Database $db): bool
     if ($path === '/health' && $method === 'GET') {
         $checks = [];
 
+        // .htaccess file integrity check
+        // Hashes are auto-generated during build process - DO NOT EDIT MANUALLY
+        $htaccessFiles = [
+            'root' => [
+                'path' => EDIT_BASE_PATH . '/.htaccess',
+                'hash' => '{{HASH_ROOT}}',
+                'label' => '_edit/.htaccess'
+            ],
+            'admin' => [
+                'path' => EDIT_BASE_PATH . '/admin/.htaccess',
+                'hash' => '{{HASH_ADMIN}}',
+                'label' => 'admin/.htaccess'
+            ],
+            'admin_api' => [
+                'path' => EDIT_BASE_PATH . '/admin-api/.htaccess',
+                'hash' => '{{HASH_ADMIN_API}}',
+                'label' => 'admin-api/.htaccess'
+            ],
+            'api' => [
+                'path' => EDIT_BASE_PATH . '/api/.htaccess',
+                'hash' => '{{HASH_API}}',
+                'label' => 'api/.htaccess'
+            ],
+            'core' => [
+                'path' => EDIT_BASE_PATH . '/core/.htaccess',
+                'hash' => '{{HASH_CORE}}',
+                'label' => 'core/.htaccess'
+            ],
+            'data' => [
+                'path' => EDIT_BASE_PATH . '/data/.htaccess',
+                'hash' => '{{HASH_DATA}}',
+                'label' => 'data/.htaccess'
+            ],
+            'uploads' => [
+                'path' => EDIT_BASE_PATH . '/uploads/.htaccess',
+                'hash' => '{{HASH_UPLOADS}}',
+                'label' => 'uploads/.htaccess'
+            ]
+        ];
+
+        $htaccessStatus = [];
+        $htaccessErrors = 0;
+        foreach ($htaccessFiles as $key => $file) {
+            if (!file_exists($file['path'])) {
+                $htaccessStatus[$key] = [
+                    'status' => 'error',
+                    'message' => 'MISSING',
+                    'label' => $file['label']
+                ];
+                $htaccessErrors++;
+            } else {
+                $currentHash = hash_file('sha256', $file['path']);
+                $isValid = $currentHash === $file['hash'];
+                $htaccessStatus[$key] = [
+                    'status' => $isValid ? 'ok' : 'error',
+                    'message' => $isValid ? 'Valid' : 'MODIFIED',
+                    'label' => $file['label']
+                ];
+                if (!$isValid) {
+                    $htaccessErrors++;
+                }
+            }
+        }
+
+        $checks['htaccess_integrity'] = [
+            'value' => $htaccessStatus,
+            'status' => $htaccessErrors === 0 ? 'ok' : 'error',
+            'message' => $htaccessErrors === 0
+                ? 'All .htaccess files valid'
+                : $htaccessErrors . ' .htaccess file(s) missing or modified - SECURITY RISK',
+            'count' => count($htaccessFiles),
+            'errors' => $htaccessErrors
+        ];
+
         $checks['php_version'] = [
             'value' => PHP_VERSION,
             'status' => version_compare(PHP_VERSION, '8.1.0', '>=') ? 'ok' : 'error',

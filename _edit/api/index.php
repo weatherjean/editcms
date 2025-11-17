@@ -24,11 +24,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // Parse request early for health checks
-$uri = $_SERVER['REQUEST_URI'];
 $method = $_SERVER['REQUEST_METHOD'];
+$path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
 // Remove /_edit/api prefix
-$path = preg_replace('#^/_edit/api/?#', '', $uri);
+$path = preg_replace('#^/_edit/api/?#', '', $path);
 $path = '/' . ltrim($path, '/');
 
 // Initialize basic services for health checks
@@ -37,9 +37,15 @@ $db = new Database(EDIT_DATABASE_PATH);
 // Load route handlers
 require_once __DIR__ . '/routes/health.php';
 require_once __DIR__ . '/routes/public.php';
+require_once __DIR__ . '/../admin-api/routes/email.php';
 
 // Route health check first (before heavy initialization)
 if (handleHealthRoutes($method, $path, $db)) {
+    exit;
+}
+
+// Route public email requests (token generation and sending)
+if (handlePublicEmailRoutes($method, $path, $db)) {
     exit;
 }
 

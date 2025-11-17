@@ -350,9 +350,8 @@ class QueryBuilder
             $bindings[] = $value;
         }
 
-        // Add WHERE bindings after SET bindings
-        $this->buildWhereBindings();
-        $bindings = array_merge($bindings, $this->bindings);
+        // Reset bindings before building WHERE clause
+        $this->bindings = [];
 
         $sql = sprintf(
             "UPDATE %s SET %s%s",
@@ -360,6 +359,9 @@ class QueryBuilder
             implode(', ', $sets),
             $this->buildWhereClause()
         );
+
+        // Merge SET bindings with WHERE bindings (added by buildWhereClause)
+        $bindings = array_merge($bindings, $this->bindings);
 
         return $this->db->execute($sql, $bindings);
     }
@@ -369,7 +371,8 @@ class QueryBuilder
      */
     public function delete(): int
     {
-        $this->buildWhereBindings();
+        // Reset bindings before building WHERE clause
+        $this->bindings = [];
 
         $sql = sprintf(
             "DELETE FROM %s%s",
@@ -377,6 +380,7 @@ class QueryBuilder
             $this->buildWhereClause()
         );
 
+        // buildWhereClause() populates $this->bindings
         return $this->db->execute($sql, $this->bindings);
     }
 
@@ -491,34 +495,6 @@ class QueryBuilder
         }
 
         return $sql . implode('', $clauses);
-    }
-
-    /**
-     * Build WHERE bindings (for UPDATE/DELETE)
-     */
-    private function buildWhereBindings(): void
-    {
-        $this->bindings = [];
-
-        foreach ($this->wheres as $where) {
-            switch ($where['type']) {
-                case 'basic':
-                    $this->bindings[] = $where['value'];
-                    break;
-
-                case 'in':
-                    foreach ($where['values'] as $value) {
-                        $this->bindings[] = $value;
-                    }
-                    break;
-
-                case 'exists':
-                    foreach ($where['bindings'] as $binding) {
-                        $this->bindings[] = $binding;
-                    }
-                    break;
-            }
-        }
     }
 
     /**

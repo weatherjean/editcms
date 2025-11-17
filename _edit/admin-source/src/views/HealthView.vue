@@ -141,6 +141,59 @@
         </div>
       </div>
 
+      <!-- .htaccess Integrity Monitor -->
+      <div v-if="health?.checks?.htaccess_integrity" class="card bg-base-100 border shadow" :class="{ 'border-error/50': health.checks.htaccess_integrity.status === 'error' }">
+        <div class="card-body">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="card-title">.htaccess Security Monitor</h2>
+            <div class="badge" :class="health.checks.htaccess_integrity.status === 'ok' ? 'badge-success' : 'badge-error'">
+              {{ health.checks.htaccess_integrity.count }} files
+            </div>
+          </div>
+
+          <div v-if="health.checks.htaccess_integrity.status === 'error'" class="alert alert-error mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <div class="font-bold">{{ health.checks.htaccess_integrity.message }}</div>
+              <div class="text-sm">Do NOT modify these files. Re-upload from original distribution if changed.</div>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <div
+              v-for="(file, key) in health.checks.htaccess_integrity.value"
+              :key="key"
+              class="flex items-center justify-between p-3 rounded-lg"
+              :class="file.status === 'ok' ? 'bg-success/10' : 'bg-error/10'"
+            >
+              <div class="flex items-center gap-3">
+                <svg v-if="file.status === 'ok'" xmlns="http://www.w3.org/2000/svg" class="size-5 text-success flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" class="size-5 text-error flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                </svg>
+                <code class="text-sm font-mono" :class="file.status === 'ok' ? 'text-success' : 'text-error'">
+                  {{ file.label }}
+                </code>
+              </div>
+              <div class="badge badge-sm" :class="file.status === 'ok' ? 'badge-success' : 'badge-error'">
+                {{ file.message }}
+              </div>
+            </div>
+          </div>
+
+          <div v-if="health.checks.htaccess_integrity.status === 'ok'" class="alert alert-success mt-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>All security files are intact and valid</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Help Card -->
       <div v-if="health?.status !== 'ok'" class="card bg-base-100 border shadow border-warning/20">
         <div class="card-body">

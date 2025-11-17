@@ -4,97 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>_edit CMS</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        .container {
-            background: white;
-            border-radius: 16px;
-            padding: 48px;
-            max-width: 600px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
-        h1 {
-            font-size: 48px;
-            margin-bottom: 16px;
-            color: #1a202c;
-        }
-        p {
-            color: #4a5568;
-            margin-bottom: 32px;
-            font-size: 18px;
-            line-height: 1.6;
-        }
-        .links {
-            display: flex;
-            gap: 16px;
-            flex-wrap: wrap;
-        }
-        a {
-            display: inline-block;
-            padding: 14px 28px;
-            background: #667eea;
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: all 0.2s;
-        }
-        a:hover {
-            background: #5568d3;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }
-        a.secondary {
-            background: #e2e8f0;
-            color: #4a5568;
-        }
-        a.secondary:hover {
-            background: #cbd5e0;
-        }
-        .api-docs {
-            margin-top: 32px;
-            padding-top: 32px;
-            border-top: 1px solid #e2e8f0;
-        }
-        .api-docs h2 {
-            font-size: 20px;
-            margin-bottom: 12px;
-            color: #2d3748;
-        }
-        .api-docs code {
-            background: #f7fafc;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 14px;
-            color: #667eea;
-        }
-    </style>
+    <link rel="icon" type="image/svg+xml" href="/_edit/admin/favicon.svg">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" type="text/css">
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
-    <div class="container">
-        <h1>_edit CMS</h1>
-        <p>Lightweight headless CMS for shared hosting</p>
+    <div class="min-h-screen flex items-center justify-center p-4" style="background-color: oklab(0.783281 0.0674275 -0.0915133);">
+        <div class="card bg-base-100 shadow-2xl max-w-md w-full">
+            <div class="card-body items-center text-center">
+                <div class="w-20 h-20 rounded-2xl flex items-center justify-center mb-4" style="background-color: oklab(0.783281 0.0674275 -0.0915133);">
+                    <svg viewBox="0 0 32 32" class="w-12 h-12">
+                        <text x="16" y="24" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="white" text-anchor="middle">e</text>
+                    </svg>
+                </div>
 
-        <div class="links">
-            <a href="/admin/">Admin Interface</a>
-            <a href="/api/health" class="secondary">API Health</a>
-        </div>
+                <h1 class="card-title text-4xl font-bold mb-2">_edit CMS</h1>
+                <p class="text-base-content/60 mb-6">
+                    Lightweight headless CMS for shared hosting
+                </p>
 
-        <div class="api-docs">
-            <h2>API Endpoints</h2>
-            <p style="font-size: 16px; margin-bottom: 16px;">
-                <strong>Admin API:</strong> <code>/admin-api/*</code> (requires authentication)<br>
-                <strong>Public API:</strong> <code>/api/*</code> (public access)
-            </p>
+                <div class="card-actions">
+                    <a href="/_edit/admin/" class="btn btn-lg gap-2" style="background-color: oklab(0.783281 0.0674275 -0.0915133); color: white; border: none;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+                        </svg>
+                        Open Admin
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 </body>
