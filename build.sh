@@ -33,10 +33,11 @@ cd _edit/admin-source
 npm install --silent
 npx vite build --outDir "${DIST_ROOT}/admin"
 
-cd ../..
+# Copy PUBLIC-API.md and .htaccess from source to build output
+cp PUBLIC-API.md "${DIST_ROOT}/admin/"
+cp .htaccess "${DIST_ROOT}/admin/"
 
-# Copy PUBLIC-API.md to admin directory
-cp _edit/admin/PUBLIC-API.md "${DIST_ROOT}/admin/"
+cd ../..
 
 # Step 3: Copy PHP backend
 echo "  → Copying PHP backend (core, admin-api, api)..."
@@ -46,7 +47,6 @@ cp -r _edit/api "${DIST_ROOT}/"
 
 # Step 4: Copy .htaccess files
 echo "  → Copying .htaccess files..."
-cp _edit/admin/.htaccess "${DIST_ROOT}/admin/"
 cp _edit/admin-api/.htaccess "${DIST_ROOT}/admin-api/"
 cp _edit/api/.htaccess "${DIST_ROOT}/api/"
 cp _edit/core/.htaccess "${DIST_ROOT}/core/"

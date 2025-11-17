@@ -5,16 +5,16 @@
       <div class="card bg-base-100 border">
         <div class="card-body p-4 flex-row items-center gap-4">
           <div class="avatar">
-            <div class="rounded">
+            <div class="w-12 rounded">
               <img :src="mediaValue.url" :alt="mediaValue.filename" class="object-cover">
             </div>
           </div>
           <div class="flex-1">
-            <div class="font-mono">{{ mediaValue.filename }}</div>
+            <div class="font-mono text-sm">{{ mediaValue.filename }}</div>
           </div>
           <div class="join">
-            <button type="button" @click="$emit('select')" class="btn btn-ghost join-item">Change</button>
-            <button type="button" @click="$emit('remove')" class="btn btn-ghost join-item">Remove</button>
+            <button type="button" @click="$emit('select')" class="btn btn-sm btn-ghost join-item">Change</button>
+            <button type="button" @click="$emit('remove')" class="btn btn-sm btn-ghost join-item">Remove</button>
           </div>
         </div>
       </div>

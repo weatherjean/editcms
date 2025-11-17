@@ -147,10 +147,23 @@ async function loadContentItem() {
   try {
     const item = await apiRequest('GET', `/${currentType.value}/${currentId.value}`)
 
+    // Parse fields - flexible_content comes as JSON string from API
+    const parsedFields = { ...(item.fields || {}) }
+
+    // Parse flexible_content if it's a string
+    if (parsedFields.flexible_content && typeof parsedFields.flexible_content === 'string') {
+      try {
+        parsedFields.flexible_content = JSON.parse(parsedFields.flexible_content)
+      } catch (e) {
+        console.error('Failed to parse flexible_content:', e)
+        parsedFields.flexible_content = []
+      }
+    }
+
     form.value = {
       slug: item.slug || '',
       status: item.status || 'draft',
-      fields: { ...(item.fields || {}) }
+      fields: parsedFields
     }
 
     // Ensure flexible_content exists if post type allows it
@@ -158,9 +171,8 @@ async function loadContentItem() {
       form.value.fields.flexible_content = []
     }
 
-    // Load media items and blocks so they can display correctly
+    // Load media items
     await loadMedia()
-    await loadBlocks()
   } catch (error) {
     console.error('Failed to load content item:', error)
   }
@@ -185,7 +197,6 @@ async function resetForm() {
   }
 
   await loadMedia()
-  await loadBlocks()
 }
 
 async function saveContent() {
@@ -318,6 +329,9 @@ watch(currentId, async () => {
 }, { immediate: true })
 
 onMounted(async () => {
+  // Load blocks first so they're available when rendering
+  await loadBlocks()
+
   if (isCreating.value) {
     await resetForm()
   } else {

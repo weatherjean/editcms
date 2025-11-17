@@ -1,7 +1,39 @@
 <template>
   <div>
-    <div class="border border-base-300 rounded-lg overflow-hidden">
+    <!-- Mode Toggle -->
+    <div class="flex justify-end mb-2">
+      <div class="btn-group">
+        <button
+          type="button"
+          :class="['btn btn-sm', !isHtmlMode ? 'btn-active' : '']"
+          @click="setMode(false)"
+        >
+          Visual
+        </button>
+        <button
+          type="button"
+          :class="['btn btn-sm', isHtmlMode ? 'btn-active' : '']"
+          @click="setMode(true)"
+        >
+          HTML
+        </button>
+      </div>
+    </div>
+
+    <!-- Visual Editor -->
+    <div v-show="!isHtmlMode" class="border border-base-300 rounded-lg overflow-hidden">
       <div ref="editorContainer"></div>
+    </div>
+
+    <!-- HTML Source Editor -->
+    <div v-show="isHtmlMode">
+      <textarea
+        v-model="htmlSource"
+        @input="onHtmlChange"
+        class="textarea textarea-bordered w-full font-mono text-sm"
+        rows="15"
+        placeholder="Enter HTML..."
+      ></textarea>
     </div>
 
     <!-- Media Modal Integration -->
@@ -36,6 +68,8 @@ const emit = defineEmits(['update:modelValue'])
 const editorContainer = ref(null)
 const mediaModalRef = ref(null)
 const mediaItems = ref([])
+const isHtmlMode = ref(false)
+const htmlSource = ref('')
 let quillInstance = null
 
 onMounted(() => {
@@ -65,18 +99,36 @@ onMounted(() => {
 
     if (props.modelValue) {
       quillInstance.root.innerHTML = props.modelValue
+      htmlSource.value = props.modelValue
     }
 
     quillInstance.on('text-change', () => {
       const html = quillInstance.root.innerHTML
       if (html === '<p><br></p>') {
         emit('update:modelValue', '')
+        htmlSource.value = ''
       } else {
         emit('update:modelValue', html)
+        htmlSource.value = html
       }
     })
   }
 })
+
+function setMode(htmlMode) {
+  if (htmlMode && quillInstance) {
+    // Switching to HTML mode - sync from visual editor
+    htmlSource.value = quillInstance.root.innerHTML
+  } else if (!htmlMode && quillInstance) {
+    // Switching to visual mode - sync from HTML editor
+    quillInstance.root.innerHTML = htmlSource.value
+  }
+  isHtmlMode.value = htmlMode
+}
+
+function onHtmlChange() {
+  emit('update:modelValue', htmlSource.value)
+}
 
 async function loadMedia() {
   try {
@@ -115,6 +167,7 @@ async function handleMediaUpload(file) {
 watch(() => props.modelValue, (newValue) => {
   if (quillInstance && quillInstance.root.innerHTML !== newValue) {
     quillInstance.root.innerHTML = newValue || ''
+    htmlSource.value = newValue || ''
   }
 })
 

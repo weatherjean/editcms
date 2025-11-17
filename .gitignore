@@ -2,6 +2,7 @@
 dist/
 *.tar.gz
 *.zip
+_edit/admin/
 
 # Development
 _edit/admin-source/node_modules/

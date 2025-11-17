@@ -225,6 +225,14 @@ function applyFieldSelection(array $item, ContentTypeRegistry $registry, array $
 {
     $fields = $item['fields'] ?? [];
 
+    // Parse flexible_content if it's a JSON string
+    if (isset($fields['flexible_content']) && is_string($fields['flexible_content'])) {
+        $decoded = json_decode($fields['flexible_content'], true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            $fields['flexible_content'] = $decoded;
+        }
+    }
+
     // Get field group definitions for this content type
     $contentTypeConfig = $registry->get($item['type']);
     $fieldGroupKeys = [];

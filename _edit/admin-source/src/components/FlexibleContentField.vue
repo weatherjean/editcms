@@ -10,19 +10,16 @@
     </div>
 
     <!-- Block Items -->
-    <div v-if="modelValue.length > 0" class="space-y-4">
+    <div v-if="modelValue && modelValue.length > 0" class="space-y-4">
       <div v-for="(item, index) in modelValue" :key="index" class="card bg-base-100 border-2 border-base-300">
         <div class="card-body">
           <!-- Block Header -->
           <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-3">
-              <span class="text-2xl">{{ getBlock(item.block_type)?.icon }}</span>
-              <div>
-                <h3 class="font-semibold">{{ getBlock(item.block_type)?.label || item.block_type }}</h3>
-                <p v-if="getBlock(item.block_type)?.description" class="opacity-60">
-                  {{ getBlock(item.block_type)?.description }}
-                </p>
-              </div>
+            <div>
+              <h3 class="font-semibold">{{ getBlock(item.block_type)?.label || item.block_type }}</h3>
+              <p v-if="getBlock(item.block_type)?.description" class="opacity-60">
+                {{ getBlock(item.block_type)?.description }}
+              </p>
             </div>
             <div class="flex gap-1">
               <button
@@ -63,9 +60,16 @@
           <!-- Block Fields -->
           <div class="space-y-4">
             <div v-for="field in getBlock(item.block_type)?.fields || []" :key="field.key">
+              <!-- Debug Info -->
+              <div v-if="false" class="text-xs opacity-50">
+                Field: {{ field.key }}, Type: {{ field.type }},
+                Value type: {{ typeof item.fields?.[field.key] }},
+                Is Array: {{ Array.isArray(item.fields?.[field.key]) }}
+              </div>
+
               <!-- Repeater Field -->
               <RepeaterField
-                v-if="field.type === 'repeater'"
+                v-if="field.type === 'repeater' && item.fields"
                 v-model="item.fields[field.key]"
                 :fields="field.config?.fields || []"
                 @selectMedia="(subFieldKey, subItem) => $emit('selectMedia', subFieldKey, subItem)"
@@ -73,7 +77,7 @@
 
               <!-- All Other Fields -->
               <FieldRenderer
-                v-else
+                v-else-if="item.fields"
                 :field="field"
                 v-model="item.fields[field.key]"
                 @selectMedia="(fieldKey) => $emit('selectMedia', fieldKey, item.fields)"
@@ -102,10 +106,9 @@
         :key="block.key"
         type="button"
         @click="addBlock(block.key)"
-        class="btn btn-outline gap-2"
+        class="btn btn-outline"
       >
-        <span>{{ block.icon }}</span>
-        <span>{{ block.label }}</span>
+        {{ block.label }}
       </button>
     </div>
   </div>
@@ -118,11 +121,11 @@ import RepeaterField from './RepeaterField.vue'
 const props = defineProps({
   modelValue: {
     type: Array,
-    required: true
+    default: () => []
   },
   availableBlocks: {
     type: Array,
-    required: true
+    default: () => []
   }
 })
 
@@ -150,16 +153,21 @@ function addBlock(blockType) {
     fields: fields
   }
 
-  emit('update:modelValue', [...props.modelValue, newItem])
+  const currentValue = props.modelValue || []
+  emit('update:modelValue', [...currentValue, newItem])
 }
 
 function removeBlock(index) {
+  if (!props.modelValue) return
+
   const updated = [...props.modelValue]
   updated.splice(index, 1)
   emit('update:modelValue', updated)
 }
 
 function moveBlock(index, direction) {
+  if (!props.modelValue) return
+
   const newIndex = index + direction
   if (newIndex < 0 || newIndex >= props.modelValue.length) return
 
