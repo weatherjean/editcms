@@ -412,6 +412,14 @@ function fetchRelatedContent(Database $db, ContentTypeRegistry $registry, int $i
         return null;
     }
 
+    // Parse flexible_content if it's a JSON string
+    if (isset($item['fields']['flexible_content']) && is_string($item['fields']['flexible_content'])) {
+        $decoded = json_decode($item['fields']['flexible_content'], true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            $item['fields']['flexible_content'] = $decoded;
+        }
+    }
+
     // Remove author_id from related content too
     unset($item['author_id']);
 
