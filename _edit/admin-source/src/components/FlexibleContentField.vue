@@ -1,32 +1,23 @@
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between">
-      <div>
-        <label class="label">
-          <span class="label-text font-semibold">Flexible Content</span>
-        </label>
-        <p class="opacity-60 -mt-2 mb-2">Build your content with reusable blocks</p>
-      </div>
-    </div>
-
     <!-- Block Items -->
     <div v-if="modelValue && modelValue.length > 0" class="space-y-4">
       <div v-for="(item, index) in modelValue" :key="index" class="card bg-base-100 border-2 border-base-300">
         <div class="card-body">
           <!-- Block Header -->
-          <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center justify-between">
             <div>
-              <h3 class="font-semibold">{{ getBlock(item.block_type)?.label || item.block_type }}</h3>
-              <p v-if="getBlock(item.block_type)?.description" class="opacity-60">
+              <h3 class="card-title">{{ getBlock(item.block_type)?.label || item.block_type }}</h3>
+              <p v-if="getBlock(item.block_type)?.description" class="opacity-60 mt-1">
                 {{ getBlock(item.block_type)?.description }}
               </p>
             </div>
-            <div class="flex gap-1">
+            <div class="join">
               <button
                 type="button"
                 @click="moveBlock(index, -1)"
                 :disabled="index === 0"
-                class="btn btn-ghost"
+                class="btn btn-ghost btn-sm join-item"
                 title="Move Up"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 20 20" fill="currentColor">
@@ -37,7 +28,7 @@
                 type="button"
                 @click="moveBlock(index, 1)"
                 :disabled="index === modelValue.length - 1"
-                class="btn btn-ghost"
+                class="btn btn-ghost btn-sm join-item"
                 title="Move Down"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 20 20" fill="currentColor">
@@ -47,7 +38,7 @@
               <button
                 type="button"
                 @click="removeBlock(index)"
-                class="btn btn-error btn-ghost"
+                class="btn btn-error btn-ghost btn-sm join-item"
                 title="Remove Block"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 20 20" fill="currentColor">
@@ -56,6 +47,8 @@
               </button>
             </div>
           </div>
+
+          <div class="divider my-0"></div>
 
           <!-- Block Fields -->
           <div class="space-y-4">

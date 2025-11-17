@@ -31,7 +31,11 @@ echo "📦 Building Vue frontend..."
 cd _edit/admin-source
 
 npm install --silent
-npx vite build --outDir "${DIST_ROOT}/admin"
+
+# Clean and build to temp directory
+rm -rf "${DIST_ROOT}/admin"
+mkdir -p "${DIST_ROOT}/admin"
+npx vite build --outDir "${DIST_ROOT}/admin" --emptyOutDir
 
 # Copy PUBLIC-API.md and .htaccess from source to build output
 cp PUBLIC-API.md "${DIST_ROOT}/admin/"
@@ -110,6 +114,9 @@ echo ""
 echo "📦 Creating distribution archive..."
 ORIGINAL_DIR=$(pwd)
 mkdir -p "${ORIGINAL_DIR}/${OUTPUT_DIR}"
+
+# Remove old zip if it exists
+rm -f "${ORIGINAL_DIR}/${OUTPUT_FILE}"
 
 cd "${TEMP_DIR}"
 zip -r -q "${ORIGINAL_DIR}/${OUTPUT_FILE}" _edit

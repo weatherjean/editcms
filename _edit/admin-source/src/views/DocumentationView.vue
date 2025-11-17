@@ -1,37 +1,38 @@
 <template>
   <div class="max-w-4xl mx-auto">
-    <div class="card bg-base-100 shadow-xl">
-      <div class="card-body">
-        <h2 class="card-title text-2xl mb-4">
+    <CardSection body-class="">
+      <template #header>
+        <h2 class="card-title text-2xl">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
           </svg>
           API Documentation
         </h2>
+      </template>
 
-        <!-- Loading -->
-        <div v-if="loading" class="flex justify-center py-8">
-          <span class="loading loading-spinner loading-lg"></span>
-        </div>
-
-        <!-- Error -->
-        <div v-else-if="error" class="alert alert-error">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span>{{ error }}</span>
-        </div>
-
-        <!-- Documentation Content -->
-        <div v-else class="prose prose-sm max-w-none" v-html="renderedMarkdown" @click="handleLinkClick"></div>
+      <!-- Loading -->
+      <div v-if="loading" class="flex justify-center py-8">
+        <span class="loading loading-spinner loading-lg"></span>
       </div>
-    </div>
+
+      <!-- Error -->
+      <div v-else-if="error" class="alert alert-error">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>{{ error }}</span>
+      </div>
+
+      <!-- Documentation Content -->
+      <div v-else class="prose prose-sm max-w-none" v-html="renderedMarkdown" @click="handleLinkClick"></div>
+    </CardSection>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { marked } from 'marked'
+import CardSection from '../components/CardSection.vue'
 import hljs from 'highlight.js/lib/core'
 import javascript from 'highlight.js/lib/languages/javascript'
 import json from 'highlight.js/lib/languages/json'

@@ -52,11 +52,7 @@
       </div>
 
       <!-- Individual Checks -->
-      <div class="card bg-base-100 border shadow">
-        <div class="card-body">
-          <h2 class="card-title mb-4">System Checks</h2>
-
-          <div class="space-y-3">
+      <CardSection title="System Checks" body-class="space-y-3">
             <!-- PHP Version -->
             <div v-if="health?.checks?.php_version" class="flex items-start gap-3 p-3 rounded-lg bg-base-200">
               <div class="flex-shrink-0 mt-1">
@@ -137,21 +133,20 @@
                 <div class="opacity-60">{{ health.checks.config_writable.message }}</div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
+      </CardSection>
 
       <!-- .htaccess Integrity Monitor -->
-      <div v-if="health?.checks?.htaccess_integrity" class="card bg-base-100 border shadow" :class="{ 'border-error/50': health.checks.htaccess_integrity.status === 'error' }">
-        <div class="card-body">
-          <div class="flex items-center justify-between mb-4">
+      <CardSection v-if="health?.checks?.htaccess_integrity" body-class="space-y-4">
+        <template #header>
+          <div class="flex items-center justify-between">
             <h2 class="card-title">.htaccess Security Monitor</h2>
             <div class="badge" :class="health.checks.htaccess_integrity.status === 'ok' ? 'badge-success' : 'badge-error'">
               {{ health.checks.htaccess_integrity.count }} files
             </div>
           </div>
+        </template>
 
-          <div v-if="health.checks.htaccess_integrity.status === 'error'" class="alert alert-error mb-4">
+          <div v-if="health.checks.htaccess_integrity.status === 'error'" class="alert alert-error">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -185,36 +180,31 @@
             </div>
           </div>
 
-          <div v-if="health.checks.htaccess_integrity.status === 'ok'" class="alert alert-success mt-4">
+          <div v-if="health.checks.htaccess_integrity.status === 'ok'" class="alert alert-success">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span>All security files are intact and valid</span>
           </div>
-        </div>
-      </div>
+      </CardSection>
 
       <!-- Help Card -->
-      <div v-if="health?.status !== 'ok'" class="card bg-base-100 border shadow border-warning/20">
-        <div class="card-body">
-          <h3 class="font-bold text-lg">Need Help?</h3>
-          <div class="space-y-2">
-            <p>If you're experiencing issues, here are some common solutions:</p>
-            <ul class="list-disc list-inside space-y-1 opacity-80">
-              <li><strong>Directory not writable:</strong> Use cPanel File Manager to set permissions to 755</li>
-              <li><strong>Missing PHP extensions:</strong> Contact your hosting provider to enable required extensions</li>
-              <li><strong>PHP version too old:</strong> Ask your host to upgrade to PHP 8.1 or newer</li>
-            </ul>
-            <p class="mt-4">For more help, check the <code class="bg-base-200 px-2 py-1 rounded">DEPLOYMENT.md</code> file in your installation.</p>
-          </div>
-        </div>
-      </div>
+      <CardSection v-if="health?.status !== 'ok'" title="Need Help?" body-class="space-y-2">
+        <p>If you're experiencing issues, here are some common solutions:</p>
+        <ul class="list-disc list-inside space-y-1 opacity-80">
+          <li><strong>Directory not writable:</strong> Use cPanel File Manager to set permissions to 755</li>
+          <li><strong>Missing PHP extensions:</strong> Contact your hosting provider to enable required extensions</li>
+          <li><strong>PHP version too old:</strong> Ask your host to upgrade to PHP 8.1 or newer</li>
+        </ul>
+        <p class="mt-4">For more help, check the <code class="bg-base-200 px-2 py-1 rounded">DEPLOYMENT.md</code> file in your installation.</p>
+      </CardSection>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import CardSection from '../components/CardSection.vue'
 
 const health = ref(null)
 const loading = ref(false)

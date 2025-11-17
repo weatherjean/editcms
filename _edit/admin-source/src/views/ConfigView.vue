@@ -28,17 +28,18 @@
 
     <div v-else class="space-y-6">
       <!-- Modules -->
-      <div class="card bg-base-100 border shadow">
-        <div class="card-body">
-          <div class="flex items-center justify-between mb-4">
+      <CardSection title="Post Types" description="Content types with their specific field groups" body-class="">
+        <template #header>
+          <div class="flex items-center justify-between">
             <div>
               <h2 class="card-title">Post Types</h2>
-              <p class="opacity-60">Content types with their specific field groups</p>
+              <p class="opacity-60 mt-1">Content types with their specific field groups</p>
             </div>
             <button @click="createPostType" class="btn btn-primary gap-2">
               + Create Post Type
             </button>
           </div>
+        </template>
 
           <div v-if="modules.length === 0" class="text-center py-8 text-base-content/60">
             No post types found. Create one to get started!
@@ -78,21 +79,21 @@
               </tbody>
             </table>
           </div>
-        </div>
-      </div>
+      </CardSection>
 
       <!-- Shared Field Groups -->
-      <div class="card bg-base-100 border shadow">
-        <div class="card-body">
-          <div class="flex items-center justify-between mb-4">
+      <CardSection title="Shared Field Groups" description="Reusable field collections" body-class="">
+        <template #header>
+          <div class="flex items-center justify-between">
             <div>
               <h2 class="card-title">Shared Field Groups</h2>
-              <p class="opacity-60">Reusable field collections</p>
+              <p class="opacity-60 mt-1">Reusable field collections</p>
             </div>
             <button @click="createFieldGroup" class="btn btn-primary gap-2">
               + Create Field Group
             </button>
           </div>
+        </template>
 
           <div v-if="fieldGroups.length === 0" class="text-center py-8 text-base-content/60">
             No field groups found. Create reusable field groups like "SEO Fields"!
@@ -133,21 +134,21 @@
               </tbody>
             </table>
           </div>
-        </div>
-      </div>
+      </CardSection>
 
       <!-- Content Blocks -->
-      <div class="card bg-base-100 border shadow">
-        <div class="card-body">
-          <div class="flex items-center justify-between mb-4">
+      <CardSection title="Content Blocks" description="Flexible content building blocks" body-class="">
+        <template #header>
+          <div class="flex items-center justify-between">
             <div>
               <h2 class="card-title">Content Blocks</h2>
-              <p class="opacity-60">Flexible content building blocks</p>
+              <p class="opacity-60 mt-1">Flexible content building blocks</p>
             </div>
             <button @click="createBlock" class="btn btn-primary gap-2">
               + Create Block
             </button>
           </div>
+        </template>
 
           <div v-if="blocks.length === 0" class="text-center py-8 text-base-content/60">
             No blocks found. Create blocks for flexible content like "Hero Section"!
@@ -187,8 +188,7 @@
               </tbody>
             </table>
           </div>
-        </div>
-      </div>
+      </CardSection>
     </div>
 
     <!-- Delete Confirmation Modal -->
@@ -226,6 +226,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useApi } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
 import { useConfirm } from '../composables/useConfirm'
+import CardSection from '../components/CardSection.vue'
 import PostTypeEditor from '../components/PostTypeEditor.vue'
 import FieldGroupEditor from '../components/FieldGroupEditor.vue'
 import BlockEditor from '../components/BlockEditor.vue'

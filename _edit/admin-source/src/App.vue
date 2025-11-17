@@ -105,7 +105,7 @@
         <div class="dropdown dropdown-end">
           <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar">
             <div class="w-10 rounded-full bg-neutral text-neutral-content">
-              <span class="flex items-center justify-center h-full">{{ user?.name?.charAt(0).toUpperCase() }}</span>
+              <span class="flex items-center justify-center h-full text-sm">{{ getUserInitials(user) }}</span>
             </div>
           </div>
           <ul tabindex="0" class="menu dropdown-content bg-base-100 rounded-box z-[1] mt-3 w-52 p-2 shadow">
@@ -274,6 +274,21 @@ function loadTheme() {
   isDarkMode.value = savedMode
   const theme = savedMode ? 'dark' : 'light'
   document.documentElement.setAttribute('data-theme', theme)
+}
+
+function getUserInitials(user) {
+  if (!user?.email) return '?'
+
+  const email = user.email
+  const parts = email.split('@')[0].split('.')
+
+  // If email has format like first.last@domain.com, use first letters of each part
+  if (parts.length > 1) {
+    return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase()
+  }
+
+  // Otherwise use first two letters of email
+  return email.substring(0, 2).toUpperCase()
 }
 
 async function init() {

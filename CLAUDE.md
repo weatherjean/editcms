@@ -27,12 +27,18 @@ Access the admin at: http://localhost:5173/_edit/admin/
 
 ### Building for Production
 
+**ALWAYS use the build script:**
+
 ```bash
-cd _edit/admin-source
-npm run build
+./build.sh
 ```
 
-Built files go to `_edit/admin/dist/`. Deploy the entire `_edit/` directory to production.
+This builds the complete distribution package including:
+- Vue admin interface compiled to `_edit/admin/`
+- PHP backend (core, admin-api, api)
+- All .htaccess files with integrity hashes
+- Complete directory structure ready for deployment
+- Output: `dist/_edit-dev.zip` (production-ready archive)
 
 ### Database
 

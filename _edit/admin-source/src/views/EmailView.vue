@@ -8,12 +8,11 @@
     </div>
 
     <!-- Email Configuration -->
-    <div class="card bg-base-100 border shadow">
-      <div class="card-body">
-        <div class="mb-4">
-          <h2 class="card-title">Email Configuration</h2>
-          <p class="opacity-60">Configure the default sender for outgoing emails (used for contact forms, etc.)</p>
-        </div>
+    <CardSection
+      title="Email Configuration"
+      description="Configure the default sender for outgoing emails (used for contact forms, etc.)"
+      body-class="space-y-4"
+    >
 
         <form @submit.prevent="saveEmailSettings" class="space-y-4">
           <fieldset class="fieldset">
@@ -131,16 +130,15 @@
             <span>{{ message }}</span>
           </div>
         </form>
-      </div>
-    </div>
+    </CardSection>
 
     <!-- Email Logs -->
-    <div class="card bg-base-100 border shadow">
-      <div class="card-body">
-        <div class="flex items-center justify-between mb-4">
+    <CardSection title="Email Send Logs" description="Recent email send attempts" body-class="">
+      <template #header>
+        <div class="flex items-center justify-between">
           <div>
             <h2 class="card-title">Email Send Logs</h2>
-            <p class="opacity-60">Recent email send attempts</p>
+            <p class="opacity-60 mt-1">Recent email send attempts</p>
           </div>
           <button @click="loadLogs" class="btn gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
@@ -149,6 +147,7 @@
             Refresh
           </button>
         </div>
+      </template>
 
         <div v-if="loadingLogs" class="flex justify-center py-8">
           <span class="loading loading-spinner loading-md"></span>
@@ -190,8 +189,7 @@
         <div v-if="logsTotal > emailLogs.length" class="text-center mt-4">
           <p class="opacity-60">Showing {{ emailLogs.length }} of {{ logsTotal }} logs</p>
         </div>
-      </div>
-    </div>
+    </CardSection>
 
     <!-- Test Email Modal -->
     <dialog ref="testEmailDialog" class="modal">
@@ -249,6 +247,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useApi } from '../composables/useApi'
+import CardSection from '../components/CardSection.vue'
 
 const { apiRequest } = useApi()
 

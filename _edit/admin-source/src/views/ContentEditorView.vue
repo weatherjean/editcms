@@ -15,48 +15,49 @@
       <!-- Main content area (2/3) -->
       <div class="lg:col-span-2 space-y-6">
         <!-- Dynamic fields from field groups -->
-        <div v-for="fieldGroup in assignedFieldGroups" :key="fieldGroup.id" class="card bg-base-100 border shadow">
-          <div class="card-body space-y-6">
-            <div>
-              <h2 class="card-title">{{ fieldGroup.title }}</h2>
-              <p v-if="fieldGroup.description" class="opacity-60 mt-1">{{ fieldGroup.description }}</p>
-            </div>
-
-            <div v-for="field in fieldGroup.fields" :key="field.key">
-              <!-- Repeater Field -->
-              <RepeaterField
-                v-if="field.type === 'repeater'"
-                v-model="form.fields[field.key]"
-                :fields="field.config?.fields || []"
-                @selectMedia="(subFieldKey, item) => openMediaModal(subFieldKey, item)"
-              />
-
-              <!-- All Other Fields -->
-              <FieldRenderer
-                v-else
-                :field="field"
-                v-model="form.fields[field.key]"
-                :relationship-items="relationshipData[field.config?.post_type]"
-                @selectMedia="openMediaModal(field.key)"
-                @loadRelationship="loadRelationshipItems"
-              >
-                <!-- Repeater slot - not used since repeater is handled above -->
-                <template #repeater></template>
-              </FieldRenderer>
-            </div>
-          </div>
-        </div>
-
-        <!-- Flexible Content (if allow_open is true) -->
-        <div v-if="currentPostType?.allow_open" class="card bg-base-100 border shadow">
-          <div class="card-body">
-            <FlexibleContentField
-              v-model="form.fields.flexible_content"
-              :available-blocks="availableBlocks"
+        <CardSection
+          v-for="fieldGroup in assignedFieldGroups"
+          :key="fieldGroup.id"
+          :title="fieldGroup.title"
+          :description="fieldGroup.description"
+        >
+          <div v-for="field in fieldGroup.fields" :key="field.key">
+            <!-- Repeater Field -->
+            <RepeaterField
+              v-if="field.type === 'repeater'"
+              v-model="form.fields[field.key]"
+              :fields="field.config?.fields || []"
               @selectMedia="(subFieldKey, item) => openMediaModal(subFieldKey, item)"
             />
+
+            <!-- All Other Fields -->
+            <FieldRenderer
+              v-else
+              :field="field"
+              v-model="form.fields[field.key]"
+              :relationship-items="relationshipData[field.config?.post_type]"
+              @selectMedia="openMediaModal(field.key)"
+              @loadRelationship="loadRelationshipItems"
+            >
+              <!-- Repeater slot - not used since repeater is handled above -->
+              <template #repeater></template>
+            </FieldRenderer>
           </div>
-        </div>
+        </CardSection>
+
+        <!-- Flexible Content (if allow_open is true) -->
+        <CardSection
+          v-if="currentPostType?.allow_open"
+          title="Flexible Content"
+          description="Build your content with reusable blocks"
+          body-class="space-y-4"
+        >
+          <FlexibleContentField
+            v-model="form.fields.flexible_content"
+            :available-blocks="availableBlocks"
+            @selectMedia="(subFieldKey, item) => openMediaModal(subFieldKey, item)"
+          />
+        </CardSection>
 
         <div v-if="assignedFieldGroups.length === 0 && !currentPostType?.allow_open" class="card bg-base-100 border shadow">
           <div class="card-body items-center text-center py-16">
@@ -101,6 +102,7 @@ import RepeaterField from '../components/RepeaterField.vue'
 import MediaModal from '../components/MediaModal.vue'
 import ContentMetadata from '../components/ContentMetadata.vue'
 import FlexibleContentField from '../components/FlexibleContentField.vue'
+import CardSection from '../components/CardSection.vue'
 
 const router = useRouter()
 const route = useRoute()
