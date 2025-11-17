@@ -28,7 +28,7 @@
     <!-- HTML Source Editor -->
     <div v-show="isHtmlMode">
       <textarea
-        v-model="htmlSource"
+        :value="htmlSource"
         @input="onHtmlChange"
         class="textarea textarea-bordered w-full font-mono text-sm"
         rows="15"
@@ -128,8 +128,9 @@ function setMode(htmlMode) {
   isHtmlMode.value = htmlMode
 }
 
-function onHtmlChange() {
-  emit('update:modelValue', htmlSource.value)
+function onHtmlChange(event) {
+  htmlSource.value = event.target.value
+  emit('update:modelValue', event.target.value)
 }
 
 async function loadMedia() {
@@ -167,7 +168,7 @@ async function handleMediaUpload(file) {
   }
 }
 watch(() => props.modelValue, (newValue) => {
-  if (quillInstance && quillInstance.root.innerHTML !== newValue) {
+  if (quillInstance && !isHtmlMode.value && quillInstance.root.innerHTML !== newValue) {
     quillInstance.root.innerHTML = newValue || ''
     htmlSource.value = newValue || ''
   }
