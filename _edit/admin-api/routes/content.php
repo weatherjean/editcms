@@ -15,9 +15,57 @@ use Edit\Core\ContentTypes\ContentType;
  * - POST /{type} - Create new content item
  * - PUT /{type}/:id - Update content item
  * - DELETE /{type}/:id - Delete content item
+ * - GET /{type}/:id/revisions - Get revisions for content item
+ * - POST /{type}/:id/revisions/:revision_id/restore - Restore a revision
  */
 function handleContentRoutes(string $method, string $path, Database $db, ContentTypeRegistry $registry, int $userId): bool
 {
+    // Check for revision routes first
+    if (preg_match('#^/([a-z_-]+)/(\d+)/revisions(/(\d+)/restore)?$#', $path, $matches)) {
+        $type = $matches[1];
+        $contentId = (int) $matches[2];
+        $isRestore = !empty($matches[3]);
+        $revisionId = $isRestore && isset($matches[4]) ? (int) $matches[4] : null;
+
+        $reserved = [
+            'auth', 'users', 'media', 'config', 'email-settings',
+            'email-logs', 'send-email', 'post-types', 'field-groups',
+            'blocks', 'health', 'public'
+        ];
+
+        if (in_array($type, $reserved)) {
+            return false;
+        }
+
+        if (!$registry->exists($type)) {
+            sendError("Content type '{$type}' not found", 404);
+        }
+
+        $contentType = new ContentType($db, $type, $registry->get($type));
+
+        try {
+            if ($isRestore && $method === 'POST') {
+                // Restore revision
+                if (!$revisionId) {
+                    sendError('Revision ID required', 400);
+                }
+                $contentType->restoreRevision($contentId, $revisionId);
+                $result = $contentType->find($contentId);
+                sendJson($result);
+            } elseif (!$isRestore && $method === 'GET') {
+                // Get revisions
+                $revisions = $contentType->getRevisions($contentId);
+                sendJson($revisions);
+            } else {
+                sendError('Method not allowed', 405);
+            }
+        } catch (\Exception $e) {
+            sendError($e->getMessage(), 500);
+        }
+        return true;
+    }
+
+    // Regular content routes
     if (preg_match('#^/([a-z_-]+)(/(\d+))?$#', $path, $matches)) {
         $type = $matches[1];
         $id = isset($matches[3]) ? (int) $matches[3] : null;

@@ -82,6 +82,14 @@
           v-model:slug="form.slug"
           v-model:status="form.status"
         />
+
+        <!-- Revisions Panel (only show for existing content) -->
+        <RevisionsPanel
+          v-if="!isCreating"
+          :content-type="currentType"
+          :content-id="currentId"
+          @restored="handleRevisionRestored"
+        />
       </div>
     </form>
 
@@ -109,6 +117,7 @@ import MediaModal from '../components/MediaModal.vue'
 import ContentMetadata from '../components/ContentMetadata.vue'
 import FlexibleContentField from '../components/FlexibleContentField.vue'
 import CardSection from '../components/CardSection.vue'
+import RevisionsPanel from '../components/RevisionsPanel.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -282,6 +291,12 @@ function normalizeMediaFields(fields) {
 function goBack() {
   router.push(`/${currentType.value}`)
 }
+
+async function handleRevisionRestored() {
+  // Reload the current content to show the restored data
+  await loadContentItem()
+}
+
 async function loadMedia() {
   try {
     mediaItems.value = await fetchMedia()

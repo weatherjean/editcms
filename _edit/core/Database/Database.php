@@ -155,6 +155,30 @@ class Database
             $this->execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)");
             $this->execute("CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)");
         }
+
+        $revisionsCheck = $this->query(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='content_revisions'"
+        );
+
+        if (empty($revisionsCheck)) {
+            $this->execute("
+                CREATE TABLE IF NOT EXISTS content_revisions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    content_id INTEGER NOT NULL,
+                    revision_number INTEGER NOT NULL,
+                    slug TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    fields TEXT NOT NULL,
+                    author_id INTEGER,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (content_id) REFERENCES content(id) ON DELETE CASCADE,
+                    FOREIGN KEY (author_id) REFERENCES users(id)
+                )
+            ");
+
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_revisions_content_id ON content_revisions(content_id)");
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_revisions_created ON content_revisions(created_at DESC)");
+        }
     }
 
     private function createSchema(): void
@@ -278,6 +302,24 @@ class Database
             $this->execute("CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)");
             $this->execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)");
             $this->execute("CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)");
+
+            $this->execute("
+                CREATE TABLE IF NOT EXISTS content_revisions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    content_id INTEGER NOT NULL,
+                    revision_number INTEGER NOT NULL,
+                    slug TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    fields TEXT NOT NULL,
+                    author_id INTEGER,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (content_id) REFERENCES content(id) ON DELETE CASCADE,
+                    FOREIGN KEY (author_id) REFERENCES users(id)
+                )
+            ");
+
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_revisions_content_id ON content_revisions(content_id)");
+            $this->execute("CREATE INDEX IF NOT EXISTS idx_revisions_created ON content_revisions(created_at DESC)");
 
             $this->commit();
         } catch (PDOException $e) {

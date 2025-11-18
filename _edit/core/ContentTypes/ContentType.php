@@ -95,6 +95,16 @@ class ContentType
         $this->db->beginTransaction();
 
         try {
+            // Get current content before updating (for revision snapshot)
+            $currentContent = $this->db->table('content')
+                ->where('id', $id)
+                ->where('type', $this->type)
+                ->first();
+
+            if (!$currentContent) {
+                throw new \RuntimeException("Content not found");
+            }
+
             // Build update data for core fields
             $updateData = [];
 
@@ -133,6 +143,9 @@ class ContentType
             // Note: QueryBuilder doesn't support CURRENT_TIMESTAMP directly, so we use PHP
             $updateData['updated_at'] = now();
 
+            // Create revision snapshot before updating
+            $this->createRevision($id, $currentContent);
+
             if (!empty($updateData)) {
                 $this->db->table('content')
                     ->where('id', $id)
@@ -145,6 +158,9 @@ class ContentType
                     ->delete();
                 $this->saveMeta($id, $data['fields']);
             }
+
+            // Cleanup old revisions (keep last 10)
+            $this->cleanupOldRevisions($id);
 
             $this->db->commit();
             return true;
@@ -544,5 +560,125 @@ class ContentType
             ->where('type', $this->type)
             ->where('slug', $slug)
             ->count() > 0;
+    }
+
+    /**
+     * Create a revision snapshot of current content
+     */
+    private function createRevision(int $contentId, array $currentContent): void
+    {
+        // Get current meta fields
+        $currentFields = $this->getMeta($contentId);
+
+        // Get next revision number
+        $lastRevision = $this->db->query(
+            "SELECT MAX(revision_number) as max_rev FROM content_revisions WHERE content_id = ?",
+            [$contentId]
+        );
+        $nextRevisionNumber = ($lastRevision[0]['max_rev'] ?? 0) + 1;
+
+        // Create revision record
+        $this->db->table('content_revisions')->insert([
+            'content_id' => $contentId,
+            'revision_number' => $nextRevisionNumber,
+            'slug' => $currentContent['slug'],
+            'status' => $currentContent['status'],
+            'fields' => json_encode($currentFields),
+            'author_id' => $currentContent['author_id']
+        ]);
+    }
+
+    /**
+     * Cleanup old revisions - keep only last 10
+     */
+    private function cleanupOldRevisions(int $contentId): void
+    {
+        // Get count of revisions
+        $count = $this->db->table('content_revisions')
+            ->where('content_id', $contentId)
+            ->count();
+
+        // If more than 10, delete oldest ones
+        if ($count > 10) {
+            $toDelete = $count - 10;
+
+            // Get IDs of oldest revisions to delete
+            $oldRevisions = $this->db->query(
+                "SELECT id FROM content_revisions WHERE content_id = ? ORDER BY created_at ASC LIMIT ?",
+                [$contentId, $toDelete]
+            );
+
+            $idsToDelete = array_column($oldRevisions, 'id');
+
+            if (!empty($idsToDelete)) {
+                $placeholders = str_repeat('?,', count($idsToDelete) - 1) . '?';
+                $this->db->execute(
+                    "DELETE FROM content_revisions WHERE id IN ($placeholders)",
+                    $idsToDelete
+                );
+            }
+        }
+    }
+
+    /**
+     * Get all revisions for a content item
+     */
+    public function getRevisions(int $contentId): array
+    {
+        $revisions = $this->db->query(
+            "SELECT r.*, u.name as author_name
+             FROM content_revisions r
+             LEFT JOIN users u ON r.author_id = u.id
+             WHERE r.content_id = ?
+             ORDER BY r.revision_number DESC",
+            [$contentId]
+        );
+
+        // Decode fields JSON for each revision
+        foreach ($revisions as &$revision) {
+            $revision['fields'] = json_decode($revision['fields'], true) ?? [];
+        }
+
+        return $revisions;
+    }
+
+    /**
+     * Restore a revision - creates a new revision with old data
+     */
+    public function restoreRevision(int $contentId, int $revisionId): bool
+    {
+        $this->db->beginTransaction();
+
+        try {
+            // Get the revision to restore
+            $revision = $this->db->table('content_revisions')
+                ->where('id', $revisionId)
+                ->where('content_id', $contentId)
+                ->first();
+
+            if (!$revision) {
+                throw new \RuntimeException("Revision not found");
+            }
+
+            // Decode fields
+            $fields = json_decode($revision['fields'], true) ?? [];
+
+            // Update content with revision data
+            $this->update($contentId, [
+                'slug' => $revision['slug'],
+                'status' => $revision['status'],
+                'fields' => $fields
+            ]);
+
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) {
+            try {
+                $this->db->rollback();
+            } catch (\Exception $rollbackEx) {
+                error_log("Rollback failed: " . $rollbackEx->getMessage());
+            }
+            throw new \RuntimeException("Failed to restore revision: {$e->getMessage()}");
+        }
     }
 }
