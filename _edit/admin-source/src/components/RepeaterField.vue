@@ -38,6 +38,18 @@
               />
             </fieldset>
 
+            <!-- Nested Repeater Field - recursive rendering -->
+            <RepeaterField
+              v-else-if="subField.type === 'repeater'"
+              v-model="item[subField.key]"
+              :fields="subField.config?.fields || []"
+              :relationship-data="relationshipData"
+              :label="subField.label"
+              :instructions="subField.instructions"
+              @selectMedia="(nestedFieldKey, nestedItem) => $emit('selectMedia', nestedFieldKey, nestedItem)"
+              @loadRelationship="(postType) => $emit('loadRelationship', postType)"
+            />
+
             <!-- All Other Fields -->
             <FieldRenderer
               v-else
@@ -106,7 +118,12 @@ const items = computed({
 function addItem() {
   const newItem = {}
   props.fields.forEach(field => {
-    newItem[field.key] = ''
+    // Initialize repeater fields as arrays, others as empty strings
+    if (field.type === 'repeater') {
+      newItem[field.key] = []
+    } else {
+      newItem[field.key] = field.default_value !== undefined ? field.default_value : ''
+    }
   })
   items.value = [...items.value, newItem]
 }
