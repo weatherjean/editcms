@@ -6,12 +6,28 @@
         <div class="card-body">
           <!-- Block Header -->
           <div class="flex items-center justify-between">
-            <div>
-              <h3 class="card-title">{{ getBlock(item.block_type)?.label || item.block_type }}</h3>
-              <p v-if="getBlock(item.block_type)?.description" class="opacity-60 mt-1">
-                {{ getBlock(item.block_type)?.description }}
-              </p>
-            </div>
+            <button
+              type="button"
+              @click="toggleCollapse(index)"
+              class="flex items-center gap-2 text-left flex-1"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="w-5 h-5 transition-transform"
+                :class="{ 'rotate-90': !collapsedBlocks[index] }"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+              <div>
+                <h3 class="card-title">{{ getBlock(item.block_type)?.label || item.block_type }}</h3>
+                <p v-if="getBlock(item.block_type)?.description" class="opacity-60 mt-1">
+                  {{ getBlock(item.block_type)?.description }}
+                </p>
+              </div>
+            </button>
             <div class="join">
               <button
                 type="button"
@@ -42,39 +58,41 @@
             </div>
           </div>
 
-          <div class="divider my-0"></div>
+          <!-- Block Fields (Collapsible) -->
+          <div v-show="!collapsedBlocks[index]">
+            <div class="divider my-0"></div>
 
-          <!-- Block Fields -->
-          <div class="space-y-4">
-            <div v-for="field in getBlock(item.block_type)?.fields || []" :key="field.key">
-              <!-- Debug Info -->
-              <div v-if="false" class="text-xs opacity-50">
-                Field: {{ field.key }}, Type: {{ field.type }},
-                Value type: {{ typeof item.fields?.[field.key] }},
-                Is Array: {{ Array.isArray(item.fields?.[field.key]) }}
+            <div class="space-y-4">
+              <div v-for="field in getBlock(item.block_type)?.fields || []" :key="field.key">
+                <!-- Debug Info -->
+                <div v-if="false" class="text-xs opacity-50">
+                  Field: {{ field.key }}, Type: {{ field.type }},
+                  Value type: {{ typeof item.fields?.[field.key] }},
+                  Is Array: {{ Array.isArray(item.fields?.[field.key]) }}
+                </div>
+
+                <!-- Repeater Field -->
+                <RepeaterField
+                  v-if="field.type === 'repeater' && item.fields"
+                  v-model="item.fields[field.key]"
+                  :fields="field.config?.fields || []"
+                  :relationship-data="relationshipData"
+                  :label="field.label"
+                  :instructions="field.instructions"
+                  @selectMedia="(subFieldKey, subItem) => $emit('selectMedia', subFieldKey, subItem)"
+                  @loadRelationship="(postType) => $emit('loadRelationship', postType)"
+                />
+
+                <!-- All Other Fields -->
+                <FieldRenderer
+                  v-else-if="item.fields"
+                  :field="field"
+                  v-model="item.fields[field.key]"
+                  :relationship-items="relationshipData[field.config?.post_type]"
+                  @selectMedia="(fieldKey) => $emit('selectMedia', fieldKey, item.fields)"
+                  @loadRelationship="(postType) => $emit('loadRelationship', postType)"
+                />
               </div>
-
-              <!-- Repeater Field -->
-              <RepeaterField
-                v-if="field.type === 'repeater' && item.fields"
-                v-model="item.fields[field.key]"
-                :fields="field.config?.fields || []"
-                :relationship-data="relationshipData"
-                :label="field.label"
-                :instructions="field.instructions"
-                @selectMedia="(subFieldKey, subItem) => $emit('selectMedia', subFieldKey, subItem)"
-                @loadRelationship="(postType) => $emit('loadRelationship', postType)"
-              />
-
-              <!-- All Other Fields -->
-              <FieldRenderer
-                v-else-if="item.fields"
-                :field="field"
-                v-model="item.fields[field.key]"
-                :relationship-items="relationshipData[field.config?.post_type]"
-                @selectMedia="(fieldKey) => $emit('selectMedia', fieldKey, item.fields)"
-                @loadRelationship="(postType) => $emit('loadRelationship', postType)"
-              />
             </div>
           </div>
         </div>
@@ -108,6 +126,7 @@
 </template>
 
 <script setup>
+import { ref, watch } from 'vue'
 import FieldRenderer from './FieldRenderer.vue'
 import RepeaterField from './RepeaterField.vue'
 import IconChevronUp from './icons/IconChevronUp.vue'
@@ -130,6 +149,25 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue', 'selectMedia', 'loadRelationship'])
+
+// Track collapsed state for each block
+const collapsedBlocks = ref([])
+
+// Initialize collapsed state when blocks change
+watch(() => props.modelValue, (newValue) => {
+  if (newValue && newValue.length > collapsedBlocks.value.length) {
+    // New blocks added - keep existing states and add true for new blocks (collapsed by default)
+    const diff = newValue.length - collapsedBlocks.value.length
+    collapsedBlocks.value = [...collapsedBlocks.value, ...Array(diff).fill(true)]
+  } else if (newValue && newValue.length < collapsedBlocks.value.length) {
+    // Blocks removed - trim the array
+    collapsedBlocks.value = collapsedBlocks.value.slice(0, newValue.length)
+  }
+}, { immediate: true })
+
+function toggleCollapse(index) {
+  collapsedBlocks.value[index] = !collapsedBlocks.value[index]
+}
 
 function getBlock(blockType) {
   return props.availableBlocks.find(b => b.key === blockType)
@@ -175,6 +213,11 @@ function moveBlock(index, direction) {
   const temp = updated[index]
   updated[index] = updated[newIndex]
   updated[newIndex] = temp
+
+  // Also swap the collapsed states
+  const tempCollapsed = collapsedBlocks.value[index]
+  collapsedBlocks.value[index] = collapsedBlocks.value[newIndex]
+  collapsedBlocks.value[newIndex] = tempCollapsed
 
   emit('update:modelValue', updated)
 }
