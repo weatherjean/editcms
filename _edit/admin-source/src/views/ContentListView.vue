@@ -27,7 +27,12 @@
           <tbody>
             <tr v-for="item in contentItems" :key="item.id" class="hover">
               <td>
-                <div class="font-mono font-semibold">{{ item.slug }}</div>
+                <button
+                  @click="editContent(item.id)"
+                  class="font-mono font-semibold hover:text-primary transition-colors text-left"
+                >
+                  {{ item.slug }}
+                </button>
               </td>
               <td>
                 <span class="badge badge-sm font-mono" :class="{

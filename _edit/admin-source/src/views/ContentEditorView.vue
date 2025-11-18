@@ -20,6 +20,7 @@
           :key="fieldGroup.id"
           :title="fieldGroup.title"
           :description="fieldGroup.description"
+          collapsible
         >
           <div v-for="field in fieldGroup.fields" :key="field.key">
             <!-- Repeater Field -->
@@ -55,6 +56,7 @@
           title="Flexible Content"
           description="Build your content with reusable blocks"
           body-class="space-y-4"
+          collapsible
         >
           <FlexibleContentField
             v-model="form.fields.flexible_content"
@@ -81,11 +83,13 @@
         <ContentMetadata
           v-model:slug="form.slug"
           v-model:status="form.status"
+          :content-type="currentType"
         />
 
         <!-- Revisions Panel (only show for existing content) -->
         <RevisionsPanel
           v-if="!isCreating"
+          ref="revisionsPanelRef"
           :content-type="currentType"
           :content-id="currentId"
           @restored="handleRevisionRestored"
@@ -140,6 +144,7 @@ const mediaItems = ref([])
 const mediaModalRef = ref(null)
 const currentMediaFieldKey = ref(null)
 const currentMediaTarget = ref(null) // For repeater items
+const revisionsPanelRef = ref(null)
 
 const relationshipData = ref({})
 const availableBlocks = ref([])
@@ -255,6 +260,8 @@ async function saveContent() {
       router.push(`/${currentType.value}/${result.id}`)
     } else {
       await loadContentItem()
+      // Refresh revisions after save
+      revisionsPanelRef.value?.refresh()
     }
 
     success(isCreating.value ? 'Created successfully!' : 'Saved successfully!')
