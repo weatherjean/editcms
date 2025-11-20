@@ -320,6 +320,11 @@ class ContentType
 
                 // Validate
                 if (!$fieldInstance->validate($value, $fieldConfig)) {
+                    error_log("Validation failed for field '{$key}': " . json_encode([
+                        'value' => $value,
+                        'type' => gettype($value),
+                        'config' => $fieldConfig
+                    ]));
                     throw new \RuntimeException("Validation failed for field '{$key}'");
                 }
 
@@ -502,6 +507,7 @@ class ContentType
 
     /**
      * Populate a media field with full media data
+     * Handles both single media ID and arrays of IDs
      */
     private function populateMediaField($mediaId)
     {
@@ -509,6 +515,22 @@ class ContentType
             return null;
         }
 
+        // Handle array of media IDs
+        if (is_array($mediaId)) {
+            $mediaItems = [];
+            foreach ($mediaId as $id) {
+                if (!$id) {
+                    continue;
+                }
+                $media = $this->db->table('media')->where('id', $id)->first();
+                if ($media) {
+                    $mediaItems[] = addMediaUrl($media);
+                }
+            }
+            return !empty($mediaItems) ? $mediaItems : null;
+        }
+
+        // Handle single media ID
         $media = $this->db->table('media')->where('id', $mediaId)->first();
         if ($media) {
             // Use global helper function from helpers.php to add URL

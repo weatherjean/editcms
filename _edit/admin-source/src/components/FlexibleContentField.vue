@@ -79,7 +79,7 @@
                   :relationship-data="relationshipData"
                   :label="field.label"
                   :instructions="field.instructions"
-                  @selectMedia="(subFieldKey, subItem) => $emit('selectMedia', subFieldKey, subItem)"
+                  @selectMedia="(subFieldKey, subItem, subField) => $emit('selectMedia', subFieldKey, subItem, subField)"
                   @loadRelationship="(postType) => $emit('loadRelationship', postType)"
                 />
 
@@ -89,7 +89,7 @@
                   :field="field"
                   v-model="item.fields[field.key]"
                   :relationship-items="relationshipData[field.config?.post_type]"
-                  @selectMedia="(fieldKey) => $emit('selectMedia', fieldKey, item.fields)"
+                  @selectMedia="$emit('selectMedia', field.key, item.fields, field)"
                   @loadRelationship="(postType) => $emit('loadRelationship', postType)"
                 />
               </div>

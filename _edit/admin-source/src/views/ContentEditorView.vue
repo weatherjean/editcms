@@ -31,7 +31,7 @@
               :relationship-data="relationshipData"
               :label="field.label"
               :instructions="field.instructions"
-              @selectMedia="(subFieldKey, item) => openMediaModal(subFieldKey, item)"
+              @selectMedia="(subFieldKey, item, subField) => openMediaModal(subFieldKey, item, subField)"
               @loadRelationship="loadRelationshipItems"
             />
 
@@ -41,7 +41,7 @@
               :field="field"
               v-model="form.fields[field.key]"
               :relationship-items="relationshipData[field.config?.post_type]"
-              @selectMedia="openMediaModal(field.key)"
+              @selectMedia="openMediaModal(field.key, null, field)"
               @loadRelationship="loadRelationshipItems"
             >
               <!-- Repeater slot - not used since repeater is handled above -->
@@ -62,7 +62,7 @@
             v-model="form.fields.flexible_content"
             :available-blocks="availableBlocks"
             :relationship-data="relationshipData"
-            @selectMedia="(subFieldKey, item) => openMediaModal(subFieldKey, item)"
+            @selectMedia="(subFieldKey, item, subField) => openMediaModal(subFieldKey, item, subField)"
             @loadRelationship="loadRelationshipItems"
           />
         </CardSection>
@@ -102,6 +102,7 @@
       ref="mediaModalRef"
       :media-items="mediaItems"
       :selected-media-id="currentMediaTarget ? currentMediaTarget[currentMediaFieldKey] : form.fields[currentMediaFieldKey]"
+      :multiple="currentMediaFieldConfig?.multiple || false"
       @select="selectMediaItem"
       @close="closeMediaModal"
       @upload="uploadMediaFile"
@@ -144,6 +145,7 @@ const mediaItems = ref([])
 const mediaModalRef = ref(null)
 const currentMediaFieldKey = ref(null)
 const currentMediaTarget = ref(null) // For repeater items
+const currentMediaFieldConfig = ref(null) // Store field config for media modal
 const revisionsPanelRef = ref(null)
 
 const relationshipData = ref({})
@@ -156,28 +158,13 @@ const currentPostType = computed(() => {
 })
 
 const assignedFieldGroups = computed(() => {
-  console.log('Computing assignedFieldGroups...')
-  console.log('  currentType:', currentType.value)
-  console.log('  All available field groups:', props.fieldGroups?.map(fg => ({
-    key: fg.key,
-    title: fg.title,
-    locations: fg.locations,
-    fields: fg.fields?.map(f => ({ key: f.key, type: f.type, config: f.config }))
-  })))
-
   if (!currentType.value || !props.fieldGroups) {
-    console.log('  Returning empty - missing currentType or fieldGroups')
     return []
   }
 
-  const filtered = props.fieldGroups.filter(fg => {
-    const hasLocation = fg.locations && fg.locations.includes(currentType.value)
-    console.log(`  Field group ${fg.key}: locations=${fg.locations}, includes ${currentType.value}? ${hasLocation}`)
-    return hasLocation
+  return props.fieldGroups.filter(fg => {
+    return fg.locations && fg.locations.includes(currentType.value)
   })
-
-  console.log('  Filtered result:', filtered)
-  return filtered
 })
 
 async function loadContentItem() {
@@ -254,6 +241,8 @@ async function saveContent() {
       normalizedForm.fields = normalizeMediaFields(normalizedForm.fields)
     }
 
+    console.log('Saving content with normalized fields:', normalizedForm.fields)
+
     const result = await apiRequest(method, url, normalizedForm)
 
     if (isCreating.value && result.id) {
@@ -277,14 +266,28 @@ function normalizeMediaFields(fields) {
     const value = fields[key]
 
     if (Array.isArray(value)) {
-      normalized[key] = value.map(item => {
-        if (typeof item === 'object' && item !== null) {
-          return normalizeMediaFields(item)
-        }
-        return item
-      })
+      // Check if this is an array of media objects (has id property)
+      const hasMediaObjects = value.some(item =>
+        typeof item === 'object' && item !== null && 'id' in item
+      )
+
+      if (hasMediaObjects) {
+        // Extract IDs from media objects, filter out non-media items
+        normalized[key] = value
+          .filter(item => typeof item === 'object' && item !== null && item.id)
+          .map(item => item.id)
+      } else {
+        // Recursively normalize nested structures (like repeater items)
+        normalized[key] = value.map(item => {
+          if (typeof item === 'object' && item !== null && !('id' in item)) {
+            return normalizeMediaFields(item)
+          }
+          return item
+        })
+      }
     }
-    else if (value && typeof value === 'object' && value.id && value.url) {
+    else if (value && typeof value === 'object' && 'id' in value) {
+      // Single media object - extract ID
       normalized[key] = value.id
     }
     else {
@@ -312,9 +315,10 @@ async function loadMedia() {
   }
 }
 
-function openMediaModal(fieldKey, target = null) {
+function openMediaModal(fieldKey, target = null, fieldConfig = null) {
   currentMediaFieldKey.value = fieldKey
   currentMediaTarget.value = target
+  currentMediaFieldConfig.value = fieldConfig?.config || null
   loadMedia()
   mediaModalRef.value?.open()
 }
@@ -322,17 +326,35 @@ function openMediaModal(fieldKey, target = null) {
 function closeMediaModal() {
   currentMediaFieldKey.value = null
   currentMediaTarget.value = null
+  currentMediaFieldConfig.value = null
 }
 
-function selectMediaItem(mediaId) {
+function selectMediaItem(mediaIdOrIds) {
   if (currentMediaFieldKey.value) {
-    const mediaObject = mediaItems.value.find(m => m.id === mediaId)
+    const isMultiple = currentMediaFieldConfig.value?.multiple || false
 
-    if (mediaObject) {
+    if (isMultiple && Array.isArray(mediaIdOrIds)) {
+      // Handle multiple selection
+      const mediaObjects = mediaIdOrIds
+        .map(id => mediaItems.value.find(m => m.id === id))
+        .filter(Boolean)
+
       if (currentMediaTarget.value) {
-        currentMediaTarget.value[currentMediaFieldKey.value] = mediaObject
+        currentMediaTarget.value[currentMediaFieldKey.value] = mediaObjects
       } else {
-        form.value.fields[currentMediaFieldKey.value] = mediaObject
+        form.value.fields[currentMediaFieldKey.value] = mediaObjects
+      }
+    } else {
+      // Handle single selection
+      const mediaId = Array.isArray(mediaIdOrIds) ? mediaIdOrIds[0] : mediaIdOrIds
+      const mediaObject = mediaItems.value.find(m => m.id === mediaId)
+
+      if (mediaObject) {
+        if (currentMediaTarget.value) {
+          currentMediaTarget.value[currentMediaFieldKey.value] = mediaObject
+        } else {
+          form.value.fields[currentMediaFieldKey.value] = mediaObject
+        }
       }
     }
   }
@@ -353,14 +375,11 @@ async function loadRelationshipItems(postType) {
   if (!postType) return
 
   if (relationshipData.value[postType]) {
-    console.log(`Relationship items for ${postType} already loaded:`, relationshipData.value[postType])
     return
   }
 
   try {
-    console.log(`Loading relationship items for: ${postType}`)
     const items = await apiRequest('GET', `/${postType}`)
-    console.log(`Loaded ${items.length} items for ${postType}:`, items)
     relationshipData.value[postType] = items
   } catch (error) {
     console.error(`Failed to load ${postType}:`, error)
@@ -372,26 +391,16 @@ async function preloadRelationships() {
   // Find all relationship fields
   const relationshipFieldsToLoad = new Set()
 
-  console.log('Current post type:', currentType.value)
-  console.log('Assigned field groups:', assignedFieldGroups.value)
-  console.log('Available blocks:', availableBlocks.value)
-
   // Check field groups for relationship fields
   assignedFieldGroups.value.forEach(group => {
-    console.log('Processing field group:', group.key, 'with fields:', group.fields)
     group.fields?.forEach(field => {
-      console.log('Field:', field.key, 'Type:', field.type, 'Config:', field.config)
       if (field.type === 'relationship' && field.config?.post_type) {
-        console.log('Adding relationship field for post type:', field.config.post_type)
         relationshipFieldsToLoad.add(field.config.post_type)
       }
       // Check for relationship fields inside repeaters
       if (field.type === 'repeater' && field.config?.fields) {
-        console.log('Field group has repeater field, checking sub-fields...')
         field.config.fields.forEach(subField => {
-          console.log('Repeater sub-field:', subField.key, 'Type:', subField.type, 'Config:', subField.config)
           if (subField.type === 'relationship' && subField.config?.post_type) {
-            console.log('Adding relationship field from repeater for post type:', subField.config.post_type)
             relationshipFieldsToLoad.add(subField.config.post_type)
           }
         })
@@ -401,22 +410,15 @@ async function preloadRelationships() {
 
   // Check blocks for relationship fields (for flexible content)
   if (currentPostType.value?.allow_open) {
-    console.log('Post type allows flexible content, checking blocks...')
     availableBlocks.value.forEach(block => {
-      console.log('Processing block:', block.key, 'with fields:', block.fields)
       block.fields?.forEach(field => {
-        console.log('Block field:', field.key, 'Type:', field.type, 'Config:', field.config)
         if (field.type === 'relationship' && field.config?.post_type) {
-          console.log('Adding relationship field from block for post type:', field.config.post_type)
           relationshipFieldsToLoad.add(field.config.post_type)
         }
         // Check for relationship fields inside repeaters
         if (field.type === 'repeater' && field.config?.fields) {
-          console.log('Block has repeater field, checking sub-fields...')
           field.config.fields.forEach(subField => {
-            console.log('Repeater sub-field:', subField.key, 'Type:', subField.type, 'Config:', subField.config)
             if (subField.type === 'relationship' && subField.config?.post_type) {
-              console.log('Adding relationship field from repeater for post type:', subField.config.post_type)
               relationshipFieldsToLoad.add(subField.config.post_type)
             }
           })
@@ -425,14 +427,10 @@ async function preloadRelationships() {
     })
   }
 
-  console.log('Preloading relationships for:', Array.from(relationshipFieldsToLoad))
-
   // Load all relationship data in parallel
   await Promise.all(
     Array.from(relationshipFieldsToLoad).map(postType => loadRelationshipItems(postType))
   )
-
-  console.log('Relationship data loaded:', relationshipData.value)
 }
 async function loadBlocks() {
   try {

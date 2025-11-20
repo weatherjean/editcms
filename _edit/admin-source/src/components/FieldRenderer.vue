@@ -87,6 +87,7 @@
     <MediaField
       v-else-if="field.type === 'media'"
       :model-value="modelValue"
+      :multiple="field.config?.multiple || false"
       @select="$emit('selectMedia', field.key)"
       @remove="$emit('update:modelValue', null)"
     />

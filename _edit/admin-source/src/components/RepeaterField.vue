@@ -32,8 +32,9 @@
               <legend class="fieldset-legend">{{ subField.label }}</legend>
               <MediaField
                 :model-value="item[subField.key]"
+                :multiple="subField.config?.multiple || false"
                 size="small"
-                @select="$emit('selectMedia', subField.key, item)"
+                @select="$emit('selectMedia', subField.key, item, subField)"
                 @remove="item[subField.key] = null"
               />
             </fieldset>
@@ -46,7 +47,7 @@
               :relationship-data="relationshipData"
               :label="subField.label"
               :instructions="subField.instructions"
-              @selectMedia="(nestedFieldKey, nestedItem) => $emit('selectMedia', nestedFieldKey, nestedItem)"
+              @selectMedia="(nestedFieldKey, nestedItem, nestedField) => $emit('selectMedia', nestedFieldKey, nestedItem, nestedField)"
               @loadRelationship="(postType) => $emit('loadRelationship', postType)"
             />
 
@@ -56,7 +57,7 @@
               :field="subField"
               v-model="item[subField.key]"
               :relationship-items="relationshipData[subField.config?.post_type]"
-              @selectMedia="$emit('selectMedia', subField.key, item)"
+              @selectMedia="$emit('selectMedia', subField.key, item, subField)"
               @loadRelationship="(postType) => $emit('loadRelationship', postType)"
             />
           </div>

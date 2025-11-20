@@ -17,9 +17,13 @@
       <!-- Media Grid -->
       <div v-if="mediaItems.length > 0" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4 max-h-96 overflow-y-auto">
         <div v-for="item in mediaItems" :key="item.id"
-             @click="selectItem(item.id)"
-             class="cursor-pointer border-2 rounded-lg overflow-hidden hover:border-primary transition-colors"
-             :class="{ 'border-primary ring-2 ring-primary': selectedMediaId === item.id }">
+             @click="toggleItem(item.id)"
+             class="cursor-pointer border-2 rounded-lg overflow-hidden hover:border-primary transition-colors relative"
+             :class="{ 'border-primary ring-2 ring-primary': isSelected(item.id) }">
+          <!-- Checkbox for multiple selection -->
+          <div v-if="multiple" class="absolute top-2 left-2 z-10">
+            <input type="checkbox" :checked="isSelected(item.id)" class="checkbox checkbox-primary" @click.stop="toggleItem(item.id)">
+          </div>
           <div class="aspect-square bg-base-200">
             <img :src="item.url" :alt="item.filename" class="w-full h-full object-cover">
           </div>
@@ -36,6 +40,9 @@
       <!-- Modal Actions -->
       <div class="modal-action">
         <button type="button" @click="close" class="btn">Close</button>
+        <button v-if="multiple" type="button" @click="confirmSelection" class="btn btn-primary" :disabled="selectedMediaIds.length === 0">
+          Select {{ selectedMediaIds.length > 0 ? `(${selectedMediaIds.length})` : '' }}
+        </button>
       </div>
     </div>
     <form method="dialog" class="modal-backdrop">
@@ -45,7 +52,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
 const props = defineProps({
   mediaItems: {
@@ -53,8 +60,12 @@ const props = defineProps({
     default: () => []
   },
   selectedMediaId: {
-    type: [Number, String],
+    type: [Number, String, Array],
     default: null
+  },
+  multiple: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -62,8 +73,24 @@ const emit = defineEmits(['select', 'close', 'upload'])
 
 const modalRef = ref(null)
 const fileInputRef = ref(null)
+const selectedMediaIds = ref([])
+
+// Initialize selected items when modal opens
+watch(() => props.selectedMediaId, (value) => {
+  if (props.multiple) {
+    selectedMediaIds.value = Array.isArray(value) ? [...value] : (value ? [value] : [])
+  } else {
+    selectedMediaIds.value = value ? [value] : []
+  }
+}, { immediate: true })
 
 function open() {
+  // Reset selection based on current value
+  if (props.multiple) {
+    selectedMediaIds.value = Array.isArray(props.selectedMediaId) ? [...props.selectedMediaId] : (props.selectedMediaId ? [props.selectedMediaId] : [])
+  } else {
+    selectedMediaIds.value = props.selectedMediaId ? [props.selectedMediaId] : []
+  }
   modalRef.value?.showModal()
 }
 
@@ -72,9 +99,31 @@ function close() {
   emit('close')
 }
 
-function selectItem(mediaId) {
-  emit('select', mediaId)
-  close()
+function isSelected(mediaId) {
+  return selectedMediaIds.value.includes(mediaId)
+}
+
+function toggleItem(mediaId) {
+  if (props.multiple) {
+    // Multiple selection mode - toggle in array
+    const index = selectedMediaIds.value.indexOf(mediaId)
+    if (index > -1) {
+      selectedMediaIds.value.splice(index, 1)
+    } else {
+      selectedMediaIds.value.push(mediaId)
+    }
+  } else {
+    // Single selection mode - select and close immediately
+    emit('select', mediaId)
+    close()
+  }
+}
+
+function confirmSelection() {
+  if (props.multiple) {
+    emit('select', selectedMediaIds.value)
+    close()
+  }
 }
 
 async function handleUpload(event) {
