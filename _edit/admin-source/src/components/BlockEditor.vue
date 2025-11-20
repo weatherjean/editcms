@@ -44,6 +44,29 @@
           ></textarea>
         </fieldset>
 
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Preview Image (Optional)</legend>
+          <div class="space-y-2">
+            <!-- Image Preview -->
+            <div v-if="form.image" class="flex items-start gap-4">
+              <img :src="form.image" alt="Block preview" class="w-32 h-32 object-cover rounded border" />
+              <button type="button" @click="removeImage" class="btn btn-ghost btn-sm btn-error">Remove</button>
+            </div>
+
+            <!-- Image Upload -->
+            <div v-else>
+              <input
+                ref="imageInputRef"
+                type="file"
+                accept="image/*"
+                @change="handleImageUpload"
+                class="file-input file-input-bordered w-full"
+              />
+              <p class="opacity-60 mt-1">Will be resized to 200x200px and base64 encoded</p>
+            </div>
+          </div>
+        </fieldset>
+
         <!-- Fields -->
         <div class="divider">Fields</div>
 
@@ -70,6 +93,7 @@ import { ref, computed } from 'vue'
 import FieldBuilder from './FieldBuilder.vue'
 import { useApi } from '../composables/useApi'
 import { useToast } from '../composables/useToast'
+import { resizeAndEncodeImage } from '../utils/imageUtils'
 
 const props = defineProps({
   availablePostTypes: {
@@ -81,13 +105,15 @@ const props = defineProps({
 const emit = defineEmits(['saved'])
 
 const { apiRequest } = useApi()
-const { error: showError } = useToast()
+const { error: showError, success: showSuccess } = useToast()
 
 const dialogRef = ref(null)
+const imageInputRef = ref(null)
 const form = ref({
   key: '',
   label: '',
   description: '',
+  image: '',
   fields: []
 })
 const originalKey = ref(null)
@@ -100,6 +126,7 @@ function open(block = null) {
       key: block.key,
       label: block.label,
       description: block.description || '',
+      image: block.image || '',
       fields: JSON.parse(JSON.stringify(block.fields || []))
     }
     originalKey.value = block.key
@@ -108,6 +135,7 @@ function open(block = null) {
       key: '',
       label: '',
       description: '',
+      image: '',
       fields: []
     }
     originalKey.value = null
@@ -120,10 +148,31 @@ function close() {
     key: '',
     label: '',
     description: '',
+    image: '',
     fields: []
   }
   originalKey.value = null
   dialogRef.value?.close()
+}
+
+async function handleImageUpload(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+
+  try {
+    const base64 = await resizeAndEncodeImage(file, 200)
+    form.value.image = base64
+    showSuccess('Image uploaded and resized!')
+  } catch (error) {
+    showError('Failed to process image: ' + error.message)
+  }
+}
+
+function removeImage() {
+  form.value.image = ''
+  if (imageInputRef.value) {
+    imageInputRef.value.value = ''
+  }
 }
 
 async function save() {

@@ -110,28 +110,101 @@
       </div>
     </div>
 
-    <!-- Add Block Buttons -->
-    <div class="flex flex-wrap gap-2">
-      <button
-        v-for="block in availableBlocks"
-        :key="block.key"
-        type="button"
-        @click="addBlock(block.key)"
-        class="btn btn-outline"
-      >
-        {{ block.label }}
-      </button>
-    </div>
+    <!-- Add Block Button -->
+    <button
+      type="button"
+      @click="openBlockSelector"
+      class="btn btn-outline btn-block"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+      </svg>
+      Add Block
+    </button>
+
+    <!-- Block Selector Modal -->
+    <dialog ref="blockSelectorRef" class="modal">
+      <div class="modal-box max-w-4xl">
+        <h3 class="font-bold text-lg mb-4">Select Block Type</h3>
+
+        <!-- Search/Filter -->
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Search blocks..."
+          class="input input-bordered w-full mb-4"
+        />
+
+        <!-- Block Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
+          <button
+            v-for="block in filteredBlocks"
+            :key="block.key"
+            type="button"
+            @click="selectBlock(block.key)"
+            class="card bg-base-200 hover:bg-base-300 transition-colors cursor-pointer border-2 border-transparent hover:border-primary"
+          >
+            <div class="card-body p-4 items-center text-center">
+              <!-- Block Image or Icon -->
+              <div class="w-full aspect-square mb-2 flex items-center justify-center bg-base-100 rounded">
+                <img
+                  v-if="block.image"
+                  :src="block.image"
+                  :alt="block.label"
+                  class="w-full h-full object-cover rounded"
+                />
+                <svg
+                  v-else
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="w-12 h-12 opacity-40"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                  />
+                </svg>
+              </div>
+
+              <!-- Block Label -->
+              <h4 class="font-semibold text-sm">{{ block.label }}</h4>
+
+              <!-- Block Description -->
+              <p v-if="block.description" class="text-xs opacity-60 line-clamp-2 mt-1">
+                {{ block.description }}
+              </p>
+            </div>
+          </button>
+        </div>
+
+        <!-- Empty State -->
+        <div v-if="filteredBlocks.length === 0" class="text-center py-8 opacity-60">
+          <p class="text-sm">No blocks found</p>
+        </div>
+
+        <div class="modal-action">
+          <button type="button" @click="closeBlockSelector" class="btn">Cancel</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button type="button" @click="closeBlockSelector">close</button>
+      </form>
+    </dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import FieldRenderer from './FieldRenderer.vue'
 import RepeaterField from './RepeaterField.vue'
 import IconChevronUp from './icons/IconChevronUp.vue'
 import IconChevronDown from './icons/IconChevronDown.vue'
 import IconTrash from './icons/IconTrash.vue'
+import { useConfirm } from '../composables/useConfirm'
 
 const props = defineProps({
   modelValue: {
@@ -150,8 +223,14 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'selectMedia', 'loadRelationship'])
 
+const { confirm: confirmDialog } = useConfirm()
+
 // Track collapsed state for each block
 const collapsedBlocks = ref([])
+
+// Block selector modal
+const blockSelectorRef = ref(null)
+const searchQuery = ref('')
 
 // Initialize collapsed state when blocks change
 watch(() => props.modelValue, (newValue) => {
@@ -165,8 +244,38 @@ watch(() => props.modelValue, (newValue) => {
   }
 }, { immediate: true })
 
+// Filtered blocks based on search
+const filteredBlocks = computed(() => {
+  if (!searchQuery.value) {
+    return props.availableBlocks
+  }
+
+  const query = searchQuery.value.toLowerCase()
+  return props.availableBlocks.filter(block => {
+    return (
+      block.label?.toLowerCase().includes(query) ||
+      block.key?.toLowerCase().includes(query) ||
+      block.description?.toLowerCase().includes(query)
+    )
+  })
+})
+
 function toggleCollapse(index) {
   collapsedBlocks.value[index] = !collapsedBlocks.value[index]
+}
+
+function openBlockSelector() {
+  searchQuery.value = ''
+  blockSelectorRef.value?.showModal()
+}
+
+function closeBlockSelector() {
+  blockSelectorRef.value?.close()
+}
+
+function selectBlock(blockKey) {
+  addBlock(blockKey)
+  closeBlockSelector()
 }
 
 function getBlock(blockType) {
@@ -195,8 +304,22 @@ function addBlock(blockType) {
   emit('update:modelValue', [...currentValue, newItem])
 }
 
-function removeBlock(index) {
+async function removeBlock(index) {
   if (!props.modelValue) return
+
+  const block = props.modelValue[index]
+  const blockLabel = getBlock(block.block_type)?.label || block.block_type
+
+  const confirmed = await confirmDialog(
+    `Are you sure you want to remove this ${blockLabel} block? This action cannot be undone.`,
+    {
+      title: 'Remove Block',
+      variant: 'error',
+      confirmText: 'Remove'
+    }
+  )
+
+  if (!confirmed) return
 
   const updated = [...props.modelValue]
   updated.splice(index, 1)
