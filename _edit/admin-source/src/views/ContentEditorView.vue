@@ -22,16 +22,16 @@
           :description="fieldGroup.description"
           collapsible
         >
-          <div v-for="field in fieldGroup.fields" :key="field.key">
+          <div v-for="field in fieldGroup.fields" :key="field.key" v-if="form.fields[fieldGroup.key]">
             <!-- Repeater Field -->
             <RepeaterField
               v-if="field.type === 'repeater'"
-              v-model="form.fields[field.key]"
+              v-model="form.fields[fieldGroup.key][field.key]"
               :fields="field.config?.fields || []"
               :relationship-data="relationshipData"
               :label="field.label"
               :instructions="field.instructions"
-              @selectMedia="(subFieldKey, item, subField) => openMediaModal(subFieldKey, item, subField)"
+              @selectMedia="(subFieldKey, item, subField) => openMediaModal(fieldGroup.key, subFieldKey, item, subField)"
               @loadRelationship="loadRelationshipItems"
             />
 
@@ -39,9 +39,9 @@
             <FieldRenderer
               v-else
               :field="field"
-              v-model="form.fields[field.key]"
+              v-model="form.fields[fieldGroup.key][field.key]"
               :relationship-items="relationshipData[field.config?.post_type]"
-              @selectMedia="openMediaModal(field.key, null, field)"
+              @selectMedia="openMediaModal(fieldGroup.key, field.key, null, field)"
               @loadRelationship="loadRelationshipItems"
             >
               <!-- Repeater slot - not used since repeater is handled above -->
@@ -62,7 +62,7 @@
             v-model="form.fields.flexible_content"
             :available-blocks="availableBlocks"
             :relationship-data="relationshipData"
-            @selectMedia="(subFieldKey, item, subField) => openMediaModal(subFieldKey, item, subField)"
+            @selectMedia="(subFieldKey, item, subField) => openMediaModal(null, subFieldKey, item, subField)"
             @loadRelationship="loadRelationshipItems"
           />
         </CardSection>
@@ -101,7 +101,7 @@
     <MediaModal
       ref="mediaModalRef"
       :media-items="mediaItems"
-      :selected-media-id="currentMediaTarget ? currentMediaTarget[currentMediaFieldKey] : form.fields[currentMediaFieldKey]"
+      :selected-media-id="currentMediaTarget ? currentMediaTarget[currentMediaFieldKey] : (currentMediaFieldGroupKey ? form.fields[currentMediaFieldGroupKey]?.[currentMediaFieldKey] : form.fields[currentMediaFieldKey])"
       :multiple="currentMediaFieldConfig?.multiple || false"
       @select="selectMediaItem"
       @close="closeMediaModal"
@@ -135,6 +135,7 @@ const { success, error } = useToast()
 const currentType = computed(() => route.params.type)
 const currentId = computed(() => route.params.id || null)
 
+// Initialize form - will be properly set up in onMounted
 const form = ref({
   slug: '',
   status: 'draft',
@@ -143,6 +144,7 @@ const form = ref({
 
 const mediaItems = ref([])
 const mediaModalRef = ref(null)
+const currentMediaFieldGroupKey = ref(null) // Field group key
 const currentMediaFieldKey = ref(null)
 const currentMediaTarget = ref(null) // For repeater items
 const currentMediaFieldConfig = ref(null) // Store field config for media modal
@@ -186,6 +188,19 @@ async function loadContentItem() {
       }
     }
 
+    // Ensure all field groups are initialized as objects (prevents "cannot create property on string" errors)
+    assignedFieldGroups.value.forEach(group => {
+      if (!parsedFields[group.key] || typeof parsedFields[group.key] !== 'object' || Array.isArray(parsedFields[group.key])) {
+        parsedFields[group.key] = {}
+      }
+      // Initialize missing fields within the group
+      group.fields.forEach(field => {
+        if (!(field.key in parsedFields[group.key])) {
+          parsedFields[group.key][field.key] = field.type === 'repeater' ? [] : ''
+        }
+      })
+    })
+
     form.value = {
       slug: item.slug || '',
       status: item.status || 'draft',
@@ -209,9 +224,12 @@ async function loadContentItem() {
 
 async function resetForm() {
   const initializedFields = {}
+
+  // Group fields by field group key
   assignedFieldGroups.value.forEach(group => {
+    initializedFields[group.key] = {}
     group.fields.forEach(field => {
-      initializedFields[field.key] = field.type === 'repeater' ? [] : ''
+      initializedFields[group.key][field.key] = field.type === 'repeater' ? [] : ''
     })
   })
 
@@ -277,7 +295,7 @@ function normalizeMediaFields(fields) {
           .filter(item => typeof item === 'object' && item !== null && item.id)
           .map(item => item.id)
       } else {
-        // Recursively normalize nested structures (like repeater items)
+        // Recursively normalize nested structures (like repeater items, flexible content)
         normalized[key] = value.map(item => {
           if (typeof item === 'object' && item !== null && !('id' in item)) {
             return normalizeMediaFields(item)
@@ -289,6 +307,10 @@ function normalizeMediaFields(fields) {
     else if (value && typeof value === 'object' && 'id' in value) {
       // Single media object - extract ID
       normalized[key] = value.id
+    }
+    else if (value && typeof value === 'object' && !('id' in value)) {
+      // Field group object or nested structure - recursively normalize
+      normalized[key] = normalizeMediaFields(value)
     }
     else {
       normalized[key] = value
@@ -315,7 +337,8 @@ async function loadMedia() {
   }
 }
 
-function openMediaModal(fieldKey, target = null, fieldConfig = null) {
+function openMediaModal(fieldGroupKey, fieldKey, target = null, fieldConfig = null) {
+  currentMediaFieldGroupKey.value = fieldGroupKey
   currentMediaFieldKey.value = fieldKey
   currentMediaTarget.value = target
   currentMediaFieldConfig.value = fieldConfig?.config || null
@@ -324,6 +347,7 @@ function openMediaModal(fieldKey, target = null, fieldConfig = null) {
 }
 
 function closeMediaModal() {
+  currentMediaFieldGroupKey.value = null
   currentMediaFieldKey.value = null
   currentMediaTarget.value = null
   currentMediaFieldConfig.value = null
@@ -341,7 +365,10 @@ function selectMediaItem(mediaIdOrIds) {
 
       if (currentMediaTarget.value) {
         currentMediaTarget.value[currentMediaFieldKey.value] = mediaObjects
+      } else if (currentMediaFieldGroupKey.value) {
+        form.value.fields[currentMediaFieldGroupKey.value][currentMediaFieldKey.value] = mediaObjects
       } else {
+        // Flexible content or ungrouped field
         form.value.fields[currentMediaFieldKey.value] = mediaObjects
       }
     } else {
@@ -352,7 +379,10 @@ function selectMediaItem(mediaIdOrIds) {
       if (mediaObject) {
         if (currentMediaTarget.value) {
           currentMediaTarget.value[currentMediaFieldKey.value] = mediaObject
+        } else if (currentMediaFieldGroupKey.value) {
+          form.value.fields[currentMediaFieldGroupKey.value][currentMediaFieldKey.value] = mediaObject
         } else {
+          // Flexible content or ungrouped field
           form.value.fields[currentMediaFieldKey.value] = mediaObject
         }
       }

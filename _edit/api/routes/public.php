@@ -220,6 +220,7 @@ function parsePublicQueryParams(array $query, array $contentTypeConfig): array
 
 /**
  * Apply field selection based on fields_only, field_groups, exclude_open_fields
+ * Works with grouped field structure
  */
 function applyFieldSelection(array $item, ContentTypeRegistry $registry, array $query): array
 {
@@ -235,47 +236,47 @@ function applyFieldSelection(array $item, ContentTypeRegistry $registry, array $
 
     // Get field group definitions for this content type
     $contentTypeConfig = $registry->get($item['type']);
-    $fieldGroupKeys = [];
-    $allDefinedFields = [];
 
-    foreach ($contentTypeConfig['field_groups'] as $group) {
-        $fieldGroupKeys[] = $group['key'];
-        foreach ($group['fields'] as $field) {
-            $allDefinedFields[] = $field['key'];
-        }
-    }
-
-    // Apply field_groups filter
+    // Apply field_groups filter (filter which field groups to include)
     if (isset($query['field_groups'])) {
         $requestedGroups = array_map('trim', explode(',', $query['field_groups']));
-        $allowedFields = [];
 
-        foreach ($contentTypeConfig['field_groups'] as $group) {
-            if (in_array($group['key'], $requestedGroups)) {
-                foreach ($group['fields'] as $field) {
-                    $allowedFields[] = $field['key'];
+        // Keep only requested field groups (and flexible_content if it exists)
+        $filteredFields = [];
+        foreach ($fields as $key => $value) {
+            if ($key === 'flexible_content' || in_array($key, $requestedGroups)) {
+                $filteredFields[$key] = $value;
+            }
+        }
+        $fields = $filteredFields;
+    }
+
+    // Apply exclude_open_fields (remove flexible_content)
+    if (isset($query['exclude_open_fields']) && $query['exclude_open_fields'] === 'true') {
+        unset($fields['flexible_content']);
+    }
+
+    // Apply fields_only (filter specific fields within field groups)
+    if (isset($query['fields_only'])) {
+        $requestedFields = array_map('trim', explode(',', $query['fields_only']));
+
+        foreach ($fields as $fieldGroupKey => &$fieldGroup) {
+            if ($fieldGroupKey === 'flexible_content') {
+                continue; // Skip flexible_content
+            }
+
+            if (is_array($fieldGroup)) {
+                // Filter fields within this group
+                $fieldGroup = array_filter($fieldGroup, function($fieldKey) use ($requestedFields) {
+                    return in_array($fieldKey, $requestedFields);
+                }, ARRAY_FILTER_USE_KEY);
+
+                // Remove empty field groups
+                if (empty($fieldGroup)) {
+                    unset($fields[$fieldGroupKey]);
                 }
             }
         }
-
-        $fields = array_filter($fields, function($key) use ($allowedFields) {
-            return in_array($key, $allowedFields);
-        }, ARRAY_FILTER_USE_KEY);
-    }
-
-    // Apply exclude_open_fields
-    if (isset($query['exclude_open_fields']) && $query['exclude_open_fields'] === 'true') {
-        $fields = array_filter($fields, function($key) use ($allDefinedFields) {
-            return in_array($key, $allDefinedFields);
-        }, ARRAY_FILTER_USE_KEY);
-    }
-
-    // Apply fields_only
-    if (isset($query['fields_only'])) {
-        $requestedFields = array_map('trim', explode(',', $query['fields_only']));
-        $fields = array_filter($fields, function($key) use ($requestedFields) {
-            return in_array($key, $requestedFields);
-        }, ARRAY_FILTER_USE_KEY);
     }
 
     $item['fields'] = $fields;
@@ -284,6 +285,7 @@ function applyFieldSelection(array $item, ContentTypeRegistry $registry, array $
 
 /**
  * Populate relationship fields
+ * Works with grouped field structure
  */
 function populateRelationships(array $item, ContentType $contentType, ContentTypeRegistry $registry, string $populateParam): array
 {
@@ -294,41 +296,53 @@ function populateRelationships(array $item, ContentType $contentType, ContentTyp
     $fieldsToPopulate = array_map('trim', explode(',', $populateParam));
     $db = $contentType->getDatabase();
 
-    // Populate top-level fields (existing logic)
-    foreach ($fieldsToPopulate as $fieldKey) {
-        if (!isset($item['fields'][$fieldKey])) {
-            continue;
-        }
-
-        $value = $item['fields'][$fieldKey];
-
-        // Handle both single relationships and arrays
-        if (is_array($value)) {
-            // Multiple relationships
-            $populated = [];
-            foreach ($value as $relatedId) {
-                if (is_numeric($relatedId)) {
-                    $related = fetchRelatedContent($db, $registry, (int) $relatedId);
-                    if ($related) {
-                        $populated[] = $related;
+    // Populate fields within field groups
+    foreach ($item['fields'] as $fieldGroupKey => &$fieldGroup) {
+        if ($fieldGroupKey === 'flexible_content') {
+            // Handle flexible_content separately
+            if (is_array($fieldGroup)) {
+                foreach ($fieldGroup as &$block) {
+                    if (isset($block['fields']) && is_array($block['fields'])) {
+                        $block['fields'] = populateNestedRelationships($block['fields'], $fieldsToPopulate, $db, $registry);
                     }
                 }
             }
-            $item['fields'][$fieldKey] = $populated;
-        } elseif (is_numeric($value)) {
-            // Single relationship
-            $related = fetchRelatedContent($db, $registry, (int) $value);
-            if ($related) {
-                $item['fields'][$fieldKey] = $related;
-            }
+            continue;
         }
-    }
 
-    // Populate relationships inside flexible_content blocks
-    if (isset($item['fields']['flexible_content']) && is_array($item['fields']['flexible_content'])) {
-        foreach ($item['fields']['flexible_content'] as &$block) {
-            if (isset($block['fields']) && is_array($block['fields'])) {
-                $block['fields'] = populateNestedRelationships($block['fields'], $fieldsToPopulate, $db, $registry);
+        if (!is_array($fieldGroup)) {
+            continue;
+        }
+
+        // Populate fields within this field group
+        foreach ($fieldsToPopulate as $fieldKey) {
+            if (!isset($fieldGroup[$fieldKey])) {
+                continue;
+            }
+
+            $value = $fieldGroup[$fieldKey];
+
+            // Handle both single relationships and arrays
+            if (is_array($value) && !empty($value)) {
+                // Check if it's an array of IDs (multiple relationships)
+                if (is_numeric($value[0] ?? null)) {
+                    $populated = [];
+                    foreach ($value as $relatedId) {
+                        if (is_numeric($relatedId)) {
+                            $related = fetchRelatedContent($db, $registry, (int) $relatedId);
+                            if ($related) {
+                                $populated[] = $related;
+                            }
+                        }
+                    }
+                    $fieldGroup[$fieldKey] = $populated;
+                }
+            } elseif (is_numeric($value)) {
+                // Single relationship
+                $related = fetchRelatedContent($db, $registry, (int) $value);
+                if ($related) {
+                    $fieldGroup[$fieldKey] = $related;
+                }
             }
         }
     }

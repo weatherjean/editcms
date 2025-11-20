@@ -148,7 +148,8 @@ class ContentTypeRegistry
                 'description' => $postType['description'] ?? '',
                 'icon' => $postType['icon'] ?? 'file',
                 'allow_open' => $postType['allow_open'] ?? false,
-                'fields' => $fields
+                'fields' => $fields,
+                'field_groups' => array_values($assignedFieldGroups)  // Include field groups for scoping
             ];
         }
     }

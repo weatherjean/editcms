@@ -307,49 +307,92 @@ class ContentType
 
     /**
      * Save meta fields to database
+     * Handles both flat and grouped field structures
      */
     private function saveMeta(int $contentId, array $fields): void
     {
         foreach ($fields as $key => $value) {
-            $dbValue = $value;
-
-            // If field has a Field class instance, use it for validation/sanitization
-            if (isset($this->fieldInstances[$key]) && isset($this->config['fields'][$key])) {
-                $fieldInstance = $this->fieldInstances[$key];
-                $fieldConfig = $this->config['fields'][$key];
-
-                // Validate
-                if (!$fieldInstance->validate($value, $fieldConfig)) {
-                    error_log("Validation failed for field '{$key}': " . json_encode([
-                        'value' => $value,
-                        'type' => gettype($value),
-                        'config' => $fieldConfig
-                    ]));
-                    throw new \RuntimeException("Validation failed for field '{$key}'");
+            // Check if this is a field group (nested object)
+            if (is_array($value) && $this->isFieldGroup($key, $value)) {
+                // It's a field group - save each field with composite key
+                $fieldGroupKey = $key;
+                foreach ($value as $fieldKey => $fieldValue) {
+                    $compositeKey = "{$fieldGroupKey}.{$fieldKey}";
+                    $this->saveMetaField($contentId, $fieldKey, $fieldValue, $compositeKey);
                 }
-
-                // Sanitize
-                $sanitized = $fieldInstance->sanitize($value, $fieldConfig);
-
-                // Convert to database format
-                $dbValue = $fieldInstance->toDatabase($sanitized);
             } else {
-                // For fields without Field classes, just JSON encode arrays/objects
-                if (is_array($value) || is_object($value)) {
-                    $dbValue = json_encode($value);
-                }
+                // It's a regular field (like flexible_content)
+                $this->saveMetaField($contentId, $key, $value, $key);
             }
-
-            $this->db->table('content_meta')->insert([
-                'content_id' => $contentId,
-                'meta_key' => $key,
-                'meta_value' => $dbValue
-            ]);
         }
     }
 
     /**
+     * Save a single meta field
+     */
+    private function saveMetaField(int $contentId, string $fieldKey, mixed $value, string $dbKey): void
+    {
+        $dbValue = $value;
+
+        // If field has a Field class instance, use it for validation/sanitization
+        if (isset($this->fieldInstances[$fieldKey]) && isset($this->config['fields'][$fieldKey])) {
+            $fieldInstance = $this->fieldInstances[$fieldKey];
+            $fieldConfig = $this->config['fields'][$fieldKey];
+
+            // Validate
+            if (!$fieldInstance->validate($value, $fieldConfig)) {
+                error_log("Validation failed for field '{$fieldKey}': " . json_encode([
+                    'value' => $value,
+                    'type' => gettype($value),
+                    'config' => $fieldConfig
+                ]));
+                throw new \RuntimeException("Validation failed for field '{$fieldKey}'");
+            }
+
+            // Sanitize
+            $sanitized = $fieldInstance->sanitize($value, $fieldConfig);
+
+            // Convert to database format
+            $dbValue = $fieldInstance->toDatabase($sanitized);
+        } else {
+            // For fields without Field classes, just JSON encode arrays/objects
+            if (is_array($value) || is_object($value)) {
+                $dbValue = json_encode($value);
+            }
+        }
+
+        $this->db->table('content_meta')->insert([
+            'content_id' => $contentId,
+            'meta_key' => $dbKey,
+            'meta_value' => $dbValue
+        ]);
+    }
+
+    /**
+     * Check if a key/value pair represents a field group
+     */
+    private function isFieldGroup(string $key, mixed $value): bool
+    {
+        // If it's not an array, it's not a field group
+        if (!is_array($value)) {
+            return false;
+        }
+
+        // Check if this key exists in field_groups config
+        if (isset($this->config['field_groups'])) {
+            foreach ($this->config['field_groups'] as $group) {
+                if ($group['key'] === $key) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Retrieve meta fields from database
+     * Reconstructs grouped field structure
      */
     private function getMeta(int $contentId): array
     {
@@ -361,14 +404,33 @@ class ContentType
         $fields = [];
 
         foreach ($meta as $row) {
-            $key = $row['meta_key'];
+            $dbKey = $row['meta_key'];
             $value = $row['meta_value'];
 
-            if (isset($this->fieldInstances[$key])) {
-                $fieldInstance = $this->fieldInstances[$key];
-                $fields[$key] = $fieldInstance->fromDatabase($value);
+            // Check if this is a composite key (field_group.field)
+            if (str_contains($dbKey, '.')) {
+                [$fieldGroupKey, $fieldKey] = explode('.', $dbKey, 2);
+
+                // Initialize field group if it doesn't exist
+                if (!isset($fields[$fieldGroupKey])) {
+                    $fields[$fieldGroupKey] = [];
+                }
+
+                // Deserialize using field instance
+                if (isset($this->fieldInstances[$fieldKey])) {
+                    $fieldInstance = $this->fieldInstances[$fieldKey];
+                    $fields[$fieldGroupKey][$fieldKey] = $fieldInstance->fromDatabase($value);
+                } else {
+                    $fields[$fieldGroupKey][$fieldKey] = $value;
+                }
             } else {
-                $fields[$key] = $value;
+                // Regular field (not grouped, like flexible_content)
+                if (isset($this->fieldInstances[$dbKey])) {
+                    $fieldInstance = $this->fieldInstances[$dbKey];
+                    $fields[$dbKey] = $fieldInstance->fromDatabase($value);
+                } else {
+                    $fields[$dbKey] = $value;
+                }
             }
         }
 
@@ -377,6 +439,7 @@ class ContentType
 
     /**
      * Retrieve meta fields for multiple content IDs in a single query (batch loading)
+     * Reconstructs grouped field structure
      *
      * @param array $contentIds Array of content IDs
      * @return array Associative array with content_id as key and fields array as value
@@ -398,18 +461,37 @@ class ContentType
         $result = [];
         foreach ($meta as $row) {
             $contentId = (int)$row['content_id'];
-            $key = $row['meta_key'];
+            $dbKey = $row['meta_key'];
             $value = $row['meta_value'];
 
             if (!isset($result[$contentId])) {
                 $result[$contentId] = [];
             }
 
-            if (isset($this->fieldInstances[$key])) {
-                $fieldInstance = $this->fieldInstances[$key];
-                $result[$contentId][$key] = $fieldInstance->fromDatabase($value);
+            // Check if this is a composite key (field_group.field)
+            if (str_contains($dbKey, '.')) {
+                [$fieldGroupKey, $fieldKey] = explode('.', $dbKey, 2);
+
+                // Initialize field group if it doesn't exist
+                if (!isset($result[$contentId][$fieldGroupKey])) {
+                    $result[$contentId][$fieldGroupKey] = [];
+                }
+
+                // Deserialize using field instance
+                if (isset($this->fieldInstances[$fieldKey])) {
+                    $fieldInstance = $this->fieldInstances[$fieldKey];
+                    $result[$contentId][$fieldGroupKey][$fieldKey] = $fieldInstance->fromDatabase($value);
+                } else {
+                    $result[$contentId][$fieldGroupKey][$fieldKey] = $value;
+                }
             } else {
-                $result[$contentId][$key] = $value;
+                // Regular field (not grouped)
+                if (isset($this->fieldInstances[$dbKey])) {
+                    $fieldInstance = $this->fieldInstances[$dbKey];
+                    $result[$contentId][$dbKey] = $fieldInstance->fromDatabase($value);
+                } else {
+                    $result[$contentId][$dbKey] = $value;
+                }
             }
         }
 
@@ -425,6 +507,7 @@ class ContentType
 
     /**
      * Populate relationship fields with actual data
+     * Works with both grouped and flat field structures
      */
     private function populateRelationships(array $content): array
     {
@@ -433,6 +516,37 @@ class ContentType
         }
 
         try {
+            // Check if we have field groups
+            $hasFieldGroups = isset($this->config['field_groups']) && !empty($this->config['field_groups']);
+
+            if ($hasFieldGroups) {
+                // Process grouped structure
+                foreach ($this->config['field_groups'] as $group) {
+                    $fieldGroupKey = $group['key'];
+
+                    if (!isset($content['fields'][$fieldGroupKey]) || !is_array($content['fields'][$fieldGroupKey])) {
+                        continue;
+                    }
+
+                    foreach ($group['fields'] as $fieldConfig) {
+                        if (!isset($fieldConfig['key']) || !isset($fieldConfig['type'])) {
+                            continue;
+                        }
+
+                        $fieldKey = $fieldConfig['key'];
+                        $fieldType = $fieldConfig['type'];
+
+                        $content['fields'][$fieldGroupKey] = $this->populateFieldValue(
+                            $content['fields'][$fieldGroupKey],
+                            $fieldKey,
+                            $fieldType,
+                            $fieldConfig
+                        );
+                    }
+                }
+            }
+
+            // Also handle top-level fields (like flexible_content)
             foreach ($this->config['fields'] as $fieldKey => $fieldConfig) {
                 if (!isset($fieldConfig['type'])) {
                     continue;
@@ -440,62 +554,14 @@ class ContentType
 
                 $fieldType = $fieldConfig['type'];
 
-                // Handle media fields
-                if ($fieldType === 'media' && isset($content['fields'][$fieldKey])) {
-                    try {
-                        $content['fields'][$fieldKey] = $this->populateMediaField($content['fields'][$fieldKey]);
-                    } catch (\Exception $e) {
-                        error_log("Failed to populate media field {$fieldKey}: " . $e->getMessage());
-                    }
-                }
-
-                // Handle relationship fields
-                if ($fieldType === 'relationship' && isset($content['fields'][$fieldKey])) {
-                    try {
-                        $relatedId = $content['fields'][$fieldKey];
-                        $target = $fieldConfig['target'] ?? 'content';
-
-                        if ($relatedId) {
-                            if ($target === 'user') {
-                                $related = $this->db->table('users')
-                                    ->select(['id', 'name', 'email'])
-                                    ->where('id', $relatedId)
-                                    ->first();
-                            } else {
-                                $related = $this->db->table('content')
-                                    ->select(['id', 'type', 'slug'])
-                                    ->where('id', $relatedId)
-                                    ->first();
-                            }
-
-                            if ($related) {
-                                $content['fields'][$fieldKey] = $related;
-                            }
-                        }
-                    } catch (\Exception $e) {
-                        error_log("Failed to populate relationship field {$fieldKey}: " . $e->getMessage());
-                    }
-                }
-
-                // Handle repeater fields - recursively populate nested media fields
-                if ($fieldType === 'repeater' && isset($content['fields'][$fieldKey])) {
-                    try {
-                        $repeaterItems = $content['fields'][$fieldKey];
-                        if (is_array($repeaterItems)) {
-                            foreach ($repeaterItems as $index => $item) {
-                                if (is_array($item) && isset($fieldConfig['config']['fields'])) {
-                                    foreach ($fieldConfig['config']['fields'] as $subField) {
-                                        if ($subField['type'] === 'media' && isset($item[$subField['key']])) {
-                                            $content['fields'][$fieldKey][$index][$subField['key']] =
-                                                $this->populateMediaField($item[$subField['key']]);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } catch (\Exception $e) {
-                        error_log("Failed to populate repeater field {$fieldKey}: " . $e->getMessage());
-                    }
+                // Only process if field exists at top level (not in a group)
+                if (isset($content['fields'][$fieldKey]) && !$hasFieldGroups || ($hasFieldGroups && $fieldKey === 'flexible_content')) {
+                    $content['fields'] = $this->populateFieldValue(
+                        $content['fields'],
+                        $fieldKey,
+                        $fieldType,
+                        $fieldConfig
+                    );
                 }
             }
         } catch (\Exception $e) {
@@ -503,6 +569,66 @@ class ContentType
         }
 
         return $content;
+    }
+
+    /**
+     * Populate a single field value (media, relationship, or repeater)
+     */
+    private function populateFieldValue(array $fields, string $fieldKey, string $fieldType, array $fieldConfig): array
+    {
+        if (!isset($fields[$fieldKey])) {
+            return $fields;
+        }
+
+        try {
+            // Handle media fields
+            if ($fieldType === 'media') {
+                $fields[$fieldKey] = $this->populateMediaField($fields[$fieldKey]);
+            }
+
+            // Handle relationship fields
+            if ($fieldType === 'relationship') {
+                $relatedId = $fields[$fieldKey];
+                $target = $fieldConfig['target'] ?? 'content';
+
+                if ($relatedId) {
+                    if ($target === 'user') {
+                        $related = $this->db->table('users')
+                            ->select(['id', 'name', 'email'])
+                            ->where('id', $relatedId)
+                            ->first();
+                    } else {
+                        $related = $this->db->table('content')
+                            ->select(['id', 'type', 'slug'])
+                            ->where('id', $relatedId)
+                            ->first();
+                    }
+
+                    if ($related) {
+                        $fields[$fieldKey] = $related;
+                    }
+                }
+            }
+
+            // Handle repeater fields - recursively populate nested media fields
+            if ($fieldType === 'repeater' && is_array($fields[$fieldKey])) {
+                $repeaterItems = $fields[$fieldKey];
+                foreach ($repeaterItems as $index => $item) {
+                    if (is_array($item) && isset($fieldConfig['config']['fields'])) {
+                        foreach ($fieldConfig['config']['fields'] as $subField) {
+                            if ($subField['type'] === 'media' && isset($item[$subField['key']])) {
+                                $fields[$fieldKey][$index][$subField['key']] =
+                                    $this->populateMediaField($item[$subField['key']]);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            error_log("Failed to populate field {$fieldKey}: " . $e->getMessage());
+        }
+
+        return $fields;
     }
 
     /**
