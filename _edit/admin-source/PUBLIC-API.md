@@ -17,6 +17,7 @@ This API provides read-only access to published content for frontend application
 - [Response Format](#response-format)
 - [Error Handling](#error-handling)
 - [Rate Limits](#rate-limits)
+- [Sending Emails](#sending-emails)
 - [Examples](#examples)
 
 ---
@@ -573,6 +574,182 @@ async function fetchWithRetry(url) {
   return response.json();
 }
 ```
+
+---
+
+## Sending Emails
+
+The public email API uses a two-step token-based system to prevent spam while allowing form submissions from your frontend.
+
+### How It Works
+
+1. **Request a Token** - Generate a single-use token (valid for 30 seconds)
+2. **Send Email** - Use the token to send an email (token consumed on use)
+
+Both endpoints are **rate-limited** to prevent abuse:
+- **10 tokens per hour** per IP address
+- **20 emails per hour** per IP address
+
+### Step 1: Get Token
+
+**Endpoint:** `GET /_edit/api/send-email/token`
+
+```javascript
+const tokenResponse = await fetch('/_edit/api/send-email/token');
+const { token } = await tokenResponse.json();
+```
+
+**Response:**
+
+```json
+{
+  "token": "abc123def456..."
+}
+```
+
+### Step 2: Send Email
+
+**Endpoint:** `POST /_edit/api/send-email`
+
+**Required Fields:**
+- `token` - The token from step 1
+- `to` - Recipient email address
+- `subject` - Email subject line
+- `message` - Email body (plain text or HTML)
+
+**Optional Fields:**
+- `from_name` - Sender name (overrides default)
+- `reply_to` - Reply-to address
+
+```javascript
+const emailResponse = await fetch('/_edit/api/send-email', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    token: token,
+    to: 'recipient@example.com',
+    subject: 'Contact Form Submission',
+    message: 'Hello, this is a message from the contact form...',
+    reply_to: 'user@example.com'
+  })
+});
+
+const result = await emailResponse.json();
+```
+
+**Success Response:**
+
+```json
+{
+  "success": true,
+  "message": "Email sent successfully"
+}
+```
+
+**Error Response:**
+
+```json
+{
+  "error": "Invalid or expired token",
+  "code": 400
+}
+```
+
+### Complete Contact Form Example
+
+```javascript
+async function sendContactForm(formData) {
+  try {
+    // Step 1: Get token
+    const tokenResponse = await fetch('/_edit/api/send-email/token');
+
+    if (!tokenResponse.ok) {
+      throw new Error('Failed to get email token');
+    }
+
+    const { token } = await tokenResponse.json();
+
+    // Step 2: Send email (must happen within 30 seconds)
+    const emailResponse = await fetch('/_edit/api/send-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        token: token,
+        to: 'contact@yoursite.com',
+        subject: `Contact Form: ${formData.subject}`,
+        message: `
+Name: ${formData.name}
+Email: ${formData.email}
+
+Message:
+${formData.message}
+        `,
+        reply_to: formData.email
+      })
+    });
+
+    if (!emailResponse.ok) {
+      const error = await emailResponse.json();
+      throw new Error(error.error || 'Failed to send email');
+    }
+
+    const result = await emailResponse.json();
+    console.log('Email sent successfully!');
+    return result;
+
+  } catch (error) {
+    console.error('Error sending email:', error);
+    throw error;
+  }
+}
+
+// Usage
+const form = document.getElementById('contact-form');
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const formData = {
+    name: form.name.value,
+    email: form.email.value,
+    subject: form.subject.value,
+    message: form.message.value
+  };
+
+  try {
+    await sendContactForm(formData);
+    alert('Message sent successfully!');
+    form.reset();
+  } catch (error) {
+    alert('Failed to send message. Please try again.');
+  }
+});
+```
+
+### Important Notes
+
+**Token Expiration:**
+- Tokens expire after **30 seconds**
+- Request the token immediately before sending the email
+- Don't request tokens in advance or cache them
+
+**Rate Limiting:**
+- If you exceed rate limits, you'll receive a `429` status code
+- The `Retry-After` header indicates when you can try again
+- Limits reset every hour
+
+**SMTP Configuration:**
+- Emails require SMTP settings configured in the admin panel
+- If SMTP is not configured, the system falls back to PHP's `mail()` function
+- Test your email configuration before deploying to production
+
+**Security:**
+- Never expose your admin API credentials to frontend code
+- The token system is designed for public form submissions only
+- All email sends are logged in the admin panel for monitoring
 
 ---
 
