@@ -62,8 +62,26 @@
             </fieldset>
 
             <fieldset class="fieldset">
+              <legend class="fieldset-legend">Menu Order</legend>
+              <input
+                type="number"
+                v-model.number="form.order"
+                class="input w-full"
+                placeholder="999"
+                min="0"
+                step="10"
+              >
+              <p class="opacity-60 mt-1">Lower numbers appear first in the navigation. Use increments of 10 (e.g., 10, 20, 30) to make it easy to add more items later.</p>
+            </fieldset>
+
+            <fieldset class="fieldset">
               <legend class="fieldset-legend">Options</legend>
               <label class="label cursor-pointer justify-start gap-4">
+                <input type="checkbox" v-model="form.singleton" class="toggle">
+                <span class="label-text">Singleton (Only one item allowed)</span>
+              </label>
+              <p class="opacity-60 ml-14">Perfect for settings pages or global content that only needs a single item</p>
+              <label class="label cursor-pointer justify-start gap-4 mt-2">
                 <input type="checkbox" v-model="form.allow_open" class="toggle">
                 <span class="label-text">Allow Flexible Content (Blocks)</span>
               </label>
@@ -211,7 +229,9 @@ const form = ref({
   label: '',
   label_plural: '',
   description: '',
+  singleton: false,
   allow_open: false,
+  order: 999,
   field_groups: []
 })
 const originalKey = ref(null)
@@ -227,7 +247,9 @@ function open(module = null) {
       label: postType.label,
       label_plural: postType.label_plural,
       description: postType.description || '',
+      singleton: postType.singleton || false,
       allow_open: postType.allow_open || false,
+      order: postType.order || 999,
       field_groups: JSON.parse(JSON.stringify(module.field_groups || []))
     }
     form.value.field_groups.forEach(fg => {
@@ -240,7 +262,9 @@ function open(module = null) {
       label: '',
       label_plural: '',
       description: '',
+      singleton: false,
       allow_open: false,
+      order: 999,
       field_groups: []
     }
     originalKey.value = null
@@ -292,7 +316,9 @@ async function save() {
           label: form.value.label,
           label_plural: form.value.label_plural,
           description: form.value.description,
-          allow_open: form.value.allow_open
+          singleton: form.value.singleton,
+          allow_open: form.value.allow_open,
+          order: form.value.order
         }
       ],
       field_groups: form.value.field_groups.map(fg => ({

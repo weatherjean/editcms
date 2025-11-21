@@ -156,6 +156,23 @@ class Database
             $this->execute("CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)");
         }
 
+        // Migration: Add message, from_name, reply_to, is_html to email_logs
+        $emailLogsColumnsCheck = $this->query("PRAGMA table_info(email_logs)");
+        $hasMessageColumn = false;
+        foreach ($emailLogsColumnsCheck as $column) {
+            if ($column['name'] === 'message') {
+                $hasMessageColumn = true;
+                break;
+            }
+        }
+
+        if (!$hasMessageColumn) {
+            $this->execute("ALTER TABLE email_logs ADD COLUMN message TEXT");
+            $this->execute("ALTER TABLE email_logs ADD COLUMN from_name TEXT");
+            $this->execute("ALTER TABLE email_logs ADD COLUMN reply_to TEXT");
+            $this->execute("ALTER TABLE email_logs ADD COLUMN is_html INTEGER DEFAULT 0");
+        }
+
         $revisionsCheck = $this->query(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='content_revisions'"
         );

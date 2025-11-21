@@ -620,6 +620,7 @@ const { token } = await tokenResponse.json();
 **Optional Fields:**
 - `from_name` - Sender name (overrides default)
 - `reply_to` - Reply-to address
+- `is_html` - Set to `true` for HTML emails (default: `false`)
 
 ```javascript
 const emailResponse = await fetch('/_edit/api/send-email', {

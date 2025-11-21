@@ -56,14 +56,17 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="module in modules" :key="module.file.filename">
+                <tr v-for="module in sortedModules" :key="module.file.filename">
                   <td>
                     <div class="font-semibold">{{ module.data.post_types[0]?.label || 'Unknown' }}</div>
                     <div class="font-mono opacity-60">{{ module.data.post_types[0]?.key }}</div>
                   </td>
                   <td>
                     <div>{{ module.data.post_types[0]?.label_plural || '-' }}</div>
-                    <span v-if="module.data.post_types[0]?.allow_open" class="badge">Flexible</span>
+                    <div class="flex gap-1 mt-1">
+                      <span v-if="module.data.post_types[0]?.singleton" class="badge badge-sm">Singleton</span>
+                      <span v-if="module.data.post_types[0]?.allow_open" class="badge badge-sm">Flexible</span>
+                    </div>
                   </td>
                   <td>
                     <div>{{ module.data.field_groups?.length || 0 }} group(s)</div>
@@ -306,6 +309,23 @@ async function loadConfigType(type, files) {
     return { file, data: json }
   }))
 }
+const sortedModules = computed(() => {
+  return [...modules.value].sort((a, b) => {
+    const orderA = a.data.post_types[0]?.order ?? 999
+    const orderB = b.data.post_types[0]?.order ?? 999
+
+    // First sort by order
+    if (orderA !== orderB) {
+      return orderA - orderB
+    }
+
+    // If orders are equal, sort alphabetically by key for stability
+    const keyA = a.data.post_types[0]?.key || ''
+    const keyB = b.data.post_types[0]?.key || ''
+    return keyA.localeCompare(keyB)
+  })
+})
+
 function createPostType() {
   postTypeEditorRef.value?.open()
 }

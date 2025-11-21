@@ -108,6 +108,17 @@ async function loadContent() {
 
   try {
     contentItems.value = await apiRequest('GET', `/${currentType.value}`)
+
+    // If this is a singleton post type, redirect to edit or create
+    if (currentPostType.value?.singleton) {
+      if (contentItems.value.length > 0) {
+        // Redirect to edit the single item
+        router.replace(`/${currentType.value}/${contentItems.value[0].id}`)
+      } else {
+        // Redirect to create the single item
+        router.replace(`/${currentType.value}/create`)
+      }
+    }
   } catch (error) {
     console.error('Failed to load content:', error)
     contentItems.value = []

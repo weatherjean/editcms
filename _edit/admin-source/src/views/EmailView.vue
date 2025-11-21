@@ -140,12 +140,20 @@
             <h2 class="card-title">Email Send Logs</h2>
             <p class="opacity-60 mt-1">Recent email send attempts</p>
           </div>
-          <button @click="loadLogs" class="btn gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-            </svg>
-            Refresh
-          </button>
+          <div class="flex gap-2">
+            <button @click="clearAllLogs" class="btn btn-error btn-outline gap-2" :disabled="emailLogs.length === 0">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+              </svg>
+              Clear All
+            </button>
+            <button @click="loadLogs" class="btn gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+              Refresh
+            </button>
+          </div>
         </div>
       </template>
 
@@ -165,7 +173,7 @@
                 <th>To</th>
                 <th>Subject</th>
                 <th>Status</th>
-                <th>IP Address</th>
+                <th class="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -180,7 +188,21 @@
                   <span v-if="log.success" class="badge badge-success badge-sm">Success</span>
                   <span v-else class="badge badge-error badge-sm" :title="log.error_message">Failed</span>
                 </td>
-                <td class="font-mono opacity-60">{{ log.ip_address || '-' }}</td>
+                <td class="text-right">
+                  <div class="join">
+                    <button @click="viewLog(log)" class="btn btn-ghost btn-sm join-item tooltip tooltip-left" data-tip="View Details">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                      </svg>
+                    </button>
+                    <button @click="deleteLog(log.id)" class="btn btn-ghost btn-error btn-sm join-item tooltip tooltip-left" data-tip="Delete">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                      </svg>
+                    </button>
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -241,6 +263,75 @@
         <button>close</button>
       </form>
     </dialog>
+
+    <!-- View Log Details Modal -->
+    <dialog ref="viewLogDialog" class="modal">
+      <div class="modal-box max-w-3xl">
+        <h3 class="font-bold text-lg mb-4">Email Details</h3>
+        <div v-if="selectedLog" class="space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <div class="font-semibold opacity-60 text-sm">Date/Time</div>
+              <div>{{ formatDate(selectedLog.created_at) }} {{ formatTime(selectedLog.created_at) }}</div>
+            </div>
+            <div>
+              <div class="font-semibold opacity-60 text-sm">Status</div>
+              <div>
+                <span v-if="selectedLog.success" class="badge badge-success">Success</span>
+                <span v-else class="badge badge-error">Failed</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="font-semibold opacity-60 text-sm">To</div>
+            <div>{{ selectedLog.to_address }}</div>
+          </div>
+
+          <div>
+            <div class="font-semibold opacity-60 text-sm">Subject</div>
+            <div>{{ selectedLog.subject }}</div>
+          </div>
+
+          <div v-if="selectedLog.from_name">
+            <div class="font-semibold opacity-60 text-sm">From Name</div>
+            <div>{{ selectedLog.from_name }}</div>
+          </div>
+
+          <div v-if="selectedLog.reply_to">
+            <div class="font-semibold opacity-60 text-sm">Reply To</div>
+            <div>{{ selectedLog.reply_to }}</div>
+          </div>
+
+          <div>
+            <div class="font-semibold opacity-60 text-sm">Message Type</div>
+            <div>{{ selectedLog.is_html ? 'HTML' : 'Plain Text' }}</div>
+          </div>
+
+          <div>
+            <div class="font-semibold opacity-60 text-sm">Message</div>
+            <div class="p-3 bg-base-200 rounded whitespace-pre-wrap font-mono text-sm max-h-96 overflow-y-auto">{{ selectedLog.message || '(No message content saved)' }}</div>
+          </div>
+
+          <div v-if="!selectedLog.success && selectedLog.error_message">
+            <div class="font-semibold opacity-60 text-sm">Error</div>
+            <div class="p-3 bg-error/10 text-error rounded whitespace-pre-wrap font-mono text-sm">{{ selectedLog.error_message }}</div>
+          </div>
+
+          <div>
+            <div class="font-semibold opacity-60 text-sm">IP Address</div>
+            <div class="font-mono">{{ selectedLog.ip_address || '-' }}</div>
+          </div>
+        </div>
+
+        <div class="modal-action">
+          <button type="button" class="btn" @click="closeViewLogDialog">Close</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button @click="closeViewLogDialog">close</button>
+      </form>
+    </dialog>
   </div>
 </template>
 
@@ -273,6 +364,8 @@ const saving = ref(false)
 const testing = ref(false)
 const sending = ref(false)
 const testEmailDialog = ref(null)
+const viewLogDialog = ref(null)
+const selectedLog = ref(null)
 
 const emailLogs = ref([])
 const loadingLogs = ref(false)
@@ -372,6 +465,50 @@ function formatDate(dateString) {
 function formatTime(dateString) {
   const date = new Date(dateString)
   return date.toLocaleTimeString()
+}
+
+function viewLog(log) {
+  selectedLog.value = log
+  viewLogDialog.value?.showModal()
+}
+
+function closeViewLogDialog() {
+  viewLogDialog.value?.close()
+  selectedLog.value = null
+}
+
+async function deleteLog(logId) {
+  if (!confirm('Are you sure you want to delete this email log?')) {
+    return
+  }
+
+  try {
+    await apiRequest('DELETE', `/email-logs/${logId}`)
+    emailLogs.value = emailLogs.value.filter(log => log.id !== logId)
+    logsTotal.value--
+    message.value = 'Email log deleted successfully'
+    messageType.value = 'success'
+  } catch (error) {
+    message.value = error.message || 'Failed to delete email log'
+    messageType.value = 'error'
+  }
+}
+
+async function clearAllLogs() {
+  if (!confirm('Are you sure you want to delete ALL email logs? This cannot be undone.')) {
+    return
+  }
+
+  try {
+    const result = await apiRequest('DELETE', '/email-logs')
+    emailLogs.value = []
+    logsTotal.value = 0
+    message.value = result.message || 'All email logs cleared successfully'
+    messageType.value = 'success'
+  } catch (error) {
+    message.value = error.message || 'Failed to clear email logs'
+    messageType.value = 'error'
+  }
 }
 
 onMounted(() => {

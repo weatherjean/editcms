@@ -153,11 +153,11 @@
     <!-- Horizontal Navigation Menu -->
     <div class="bg-base-100 border-b overflow-x-auto">
       <div class="tabs tabs-boxed bg-transparent mx-4 gap-1 flex-nowrap min-w-max">
-        <a v-for="postType in postTypes" :key="postType.key"
+        <a v-for="postType in sortedPostTypes" :key="postType.key"
            @click="router.push(`/${postType.key}`)"
            class="tab whitespace-nowrap"
            :class="{ 'tab-active': route.params.type === postType.key }">
-          {{ postType.label_plural }}
+          {{ postType.singleton ? postType.label : postType.label_plural }}
         </a>
       </div>
     </div>
@@ -202,6 +202,21 @@ const isDarkMode = ref(false)
 
 const postTypes = ref([])
 const fieldGroups = ref([])
+
+const sortedPostTypes = computed(() => {
+  return [...postTypes.value].sort((a, b) => {
+    const orderA = a.order ?? 999
+    const orderB = b.order ?? 999
+
+    // First sort by order
+    if (orderA !== orderB) {
+      return orderA - orderB
+    }
+
+    // If orders are equal, sort alphabetically by key for stability
+    return a.key.localeCompare(b.key)
+  })
+})
 
 const currentType = computed(() => route.params.type || null)
 async function handleLogin() {
@@ -297,8 +312,8 @@ async function init() {
 
     // Only redirect to default if user is on root path
     if (route.path === '/' || route.path === '') {
-      if (postTypes.value.length > 0) {
-        router.push(`/${postTypes.value[0].key}`)
+      if (sortedPostTypes.value.length > 0) {
+        router.push(`/${sortedPostTypes.value[0].key}`)
       } else {
         router.push('/config')
       }

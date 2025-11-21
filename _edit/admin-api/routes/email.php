@@ -102,7 +102,7 @@ function handlePublicEmailRoutes(string $method, string $path, Database $db): bo
 
         $email = new Email($emailConfig['from_email'], $emailConfig['from_name'], $smtpConfig);
 
-        $isHtml = $data['is_html'] ?? true;
+        $isHtml = $data['is_html'] ?? false;
         $message = $data['message'];
 
         if ($isHtml) {
@@ -117,6 +117,10 @@ function handlePublicEmailRoutes(string $method, string $path, Database $db): bo
             $db->table('email_logs')->insert([
                 'to_address' => $data['to'],
                 'subject' => $data['subject'],
+                'message' => $data['message'],
+                'from_name' => $data['from_name'] ?? null,
+                'reply_to' => $data['reply_to'] ?? null,
+                'is_html' => $isHtml ? 1 : 0,
                 'success' => 1,
                 'ip_address' => $ipAddress
             ]);
@@ -126,6 +130,10 @@ function handlePublicEmailRoutes(string $method, string $path, Database $db): bo
             $db->table('email_logs')->insert([
                 'to_address' => $data['to'],
                 'subject' => $data['subject'],
+                'message' => $data['message'],
+                'from_name' => $data['from_name'] ?? null,
+                'reply_to' => $data['reply_to'] ?? null,
+                'is_html' => $isHtml ? 1 : 0,
                 'success' => 0,
                 'error_message' => $errorMessage,
                 'ip_address' => $ipAddress
@@ -231,6 +239,20 @@ function handleEmailAdminRoutes(string $method, string $path, Database $db): boo
             'limit' => $limit,
             'offset' => $offset
         ]);
+        return true;
+    }
+
+    if (preg_match('#^/email-logs/(\d+)$#', $path, $matches) && $method === 'DELETE') {
+        $logId = (int)$matches[1];
+        $db->table('email_logs')->where('id', $logId)->delete();
+        sendJson(['success' => true, 'message' => 'Email log deleted successfully']);
+        return true;
+    }
+
+    if ($path === '/email-logs' && $method === 'DELETE') {
+        $count = $db->table('email_logs')->count();
+        $db->execute("DELETE FROM email_logs");
+        sendJson(['success' => true, 'message' => "Deleted {$count} email log(s)"]);
         return true;
     }
 
