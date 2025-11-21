@@ -12,12 +12,14 @@ class ContentType
     private string $type;
     private array $config;
     private array $fieldInstances = [];
+    private $blockRegistry = null;
 
-    public function __construct(Database $db, string $type, array $config)
+    public function __construct(Database $db, string $type, array $config, $blockRegistry = null)
     {
         $this->db = $db;
         $this->type = $type;
         $this->config = $config;
+        $this->blockRegistry = $blockRegistry;
         $this->initializeFields();
     }
 
@@ -429,7 +431,17 @@ class ContentType
                     $fieldInstance = $this->fieldInstances[$dbKey];
                     $fields[$dbKey] = $fieldInstance->fromDatabase($value);
                 } else {
-                    $fields[$dbKey] = $value;
+                    // Try to JSON decode if it's a string (for flexible_content, etc.)
+                    if (is_string($value)) {
+                        $decoded = json_decode($value, true);
+                        if (json_last_error() === JSON_ERROR_NONE) {
+                            $fields[$dbKey] = $decoded;
+                        } else {
+                            $fields[$dbKey] = $value;
+                        }
+                    } else {
+                        $fields[$dbKey] = $value;
+                    }
                 }
             }
         }
@@ -490,7 +502,17 @@ class ContentType
                     $fieldInstance = $this->fieldInstances[$dbKey];
                     $result[$contentId][$dbKey] = $fieldInstance->fromDatabase($value);
                 } else {
-                    $result[$contentId][$dbKey] = $value;
+                    // Try to JSON decode if it's a string (for flexible_content, etc.)
+                    if (is_string($value)) {
+                        $decoded = json_decode($value, true);
+                        if (json_last_error() === JSON_ERROR_NONE) {
+                            $result[$contentId][$dbKey] = $decoded;
+                        } else {
+                            $result[$contentId][$dbKey] = $value;
+                        }
+                    } else {
+                        $result[$contentId][$dbKey] = $value;
+                    }
                 }
             }
         }
@@ -564,11 +586,97 @@ class ContentType
                     );
                 }
             }
+
+            // Special handling for flexible_content (populate media inside blocks)
+            if (isset($content['fields']['flexible_content']) && is_array($content['fields']['flexible_content'])) {
+                foreach ($content['fields']['flexible_content'] as $blockIndex => &$block) {
+                    if (isset($block['fields']) && is_array($block['fields']) && isset($block['block_type'])) {
+                        $block['fields'] = $this->populateFlexibleContentBlockFields($block['fields'], $block['block_type']);
+                    }
+                }
+            }
         } catch (\Exception $e) {
             error_log("Error in populateRelationships: " . $e->getMessage());
         }
 
         return $content;
+    }
+
+    /**
+     * Recursively populate media and relationship fields in flexible content blocks
+     */
+    private function populateFlexibleContentBlockFields(array $fields, string $blockType, ?array $parentFieldConfig = null): array
+    {
+        // Get block definition if we have BlockRegistry
+        $blockDefinition = null;
+        if ($this->blockRegistry) {
+            $blockDefinition = $this->blockRegistry->getBlock($blockType);
+        }
+
+        // Build field config map from block definition
+        $fieldConfigMap = [];
+        if ($blockDefinition && isset($blockDefinition['fields'])) {
+            foreach ($blockDefinition['fields'] as $fieldConfig) {
+                if (isset($fieldConfig['key'])) {
+                    $fieldConfigMap[$fieldConfig['key']] = $fieldConfig;
+                }
+            }
+        }
+        // If we have parent field config (for repeaters), use that instead
+        if ($parentFieldConfig) {
+            $fieldConfigMap = $parentFieldConfig;
+        }
+
+        foreach ($fields as $key => &$value) {
+            $fieldConfig = $fieldConfigMap[$key] ?? null;
+            $fieldType = $fieldConfig['type'] ?? null;
+
+            // Handle single numeric values
+            if (is_numeric($value) && $fieldType) {
+                if ($fieldType === 'media') {
+                    // Auto-populate media fields (always)
+                    $media = $this->db->table('media')->where('id', (int)$value)->first();
+                    if ($media) {
+                        $value = addMediaUrl($media);
+                    }
+                } elseif ($fieldType === 'relationship') {
+                    // Populate relationship (for admin) - just basic info
+                    $related = $this->db->table('content')
+                        ->select(['id', 'type', 'slug', 'status'])
+                        ->where('id', (int)$value)
+                        ->first();
+                    if ($related) {
+                        $value = $related;
+                    }
+                }
+            }
+            // Handle arrays
+            elseif (is_array($value) && !empty($value)) {
+                $isNumericArray = array_keys($value) === range(0, count($value) - 1);
+
+                if ($isNumericArray) {
+                    // Check if it's a repeater field
+                    if ($fieldType === 'repeater' && isset($fieldConfig['config']['fields'])) {
+                        // Build field map for repeater subfields
+                        $repeaterFieldMap = [];
+                        foreach ($fieldConfig['config']['fields'] as $subField) {
+                            if (isset($subField['key'])) {
+                                $repeaterFieldMap[$subField['key']] = $subField;
+                            }
+                        }
+
+                        // Recursively populate each repeater item
+                        foreach ($value as $index => &$item) {
+                            if (is_array($item)) {
+                                $value[$index] = $this->populateFlexibleContentBlockFields($item, $blockType, $repeaterFieldMap);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return $fields;
     }
 
     /**

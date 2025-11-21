@@ -40,7 +40,7 @@ function handlePublicRoutes(string $method, string $path, Database $db, ContentT
             sendError("Content type '{$type}' not found", 404);
         }
 
-        $contentType = new ContentType($db, $type, $registry->get($type));
+        $contentType = new ContentType($db, $type, $registry->get($type), $blocks);
 
         try {
             if ($slug) {
@@ -352,43 +352,85 @@ function populateRelationships(array $item, ContentType $contentType, ContentTyp
 
 /**
  * Recursively populate relationship fields in nested structures (blocks, repeaters)
+ * Also auto-populates media fields
  */
 function populateNestedRelationships(array $fields, array $fieldsToPopulate, Database $db, ContentTypeRegistry $registry): array
 {
     foreach ($fields as $key => $value) {
-        // If this field name matches the populate list and it's a relationship ID
-        if (in_array($key, $fieldsToPopulate)) {
-            if (is_numeric($value)) {
-                // Single relationship
+        // Check if this is a basic relationship object that needs full population
+        if (is_array($value) && isset($value['id']) && isset($value['type']) && isset($value['slug']) && !isset($value['fields'])) {
+            // This is a basic relationship object from ContentType - expand it if in populate list
+            if (in_array($key, $fieldsToPopulate)) {
+                $related = fetchRelatedContent($db, $registry, (int) $value['id']);
+                if ($related) {
+                    $fields[$key] = $related;
+                    continue;
+                }
+            }
+        }
+        // Auto-populate media fields (numeric IDs)
+        elseif (is_numeric($value)) {
+            // Try to fetch as media first
+            $media = $db->table('media')->where('id', (int)$value)->first();
+            if ($media) {
+                $fields[$key] = addMediaUrl($media);
+                continue;
+            }
+
+            // If not media and field is in populate list, fetch as content
+            if (in_array($key, $fieldsToPopulate)) {
                 $related = fetchRelatedContent($db, $registry, (int) $value);
                 if ($related) {
                     $fields[$key] = $related;
                 }
-            } elseif (is_array($value)) {
-                // Array of relationship IDs
-                $populated = [];
-                foreach ($value as $relatedId) {
-                    if (is_numeric($relatedId)) {
-                        $related = fetchRelatedContent($db, $registry, (int) $relatedId);
-                        if ($related) {
-                            $populated[] = $related;
-                        }
-                    }
-                }
-                if (!empty($populated)) {
-                    $fields[$key] = $populated;
-                }
             }
         }
-        // Recursively handle arrays (repeaters)
+        // Auto-populate arrays of media IDs
         elseif (is_array($value) && !empty($value)) {
             // Check if it's a numeric array (list of items)
             $isNumericArray = array_keys($value) === range(0, count($value) - 1);
+
             if ($isNumericArray) {
-                // It's a repeater - process each item
-                foreach ($value as $index => $item) {
-                    if (is_array($item)) {
-                        $fields[$key][$index] = populateNestedRelationships($item, $fieldsToPopulate, $db, $registry);
+                // Check if first item is numeric (might be array of media IDs)
+                if (is_numeric($value[0] ?? null)) {
+                    // Try to populate as media IDs
+                    $mediaItems = [];
+                    foreach ($value as $id) {
+                        if (is_numeric($id)) {
+                            $media = $db->table('media')->where('id', (int)$id)->first();
+                            if ($media) {
+                                $mediaItems[] = addMediaUrl($media);
+                            }
+                        }
+                    }
+
+                    // If we found media, use it
+                    if (!empty($mediaItems)) {
+                        $fields[$key] = $mediaItems;
+                        continue;
+                    }
+
+                    // Otherwise try as relationships if in populate list
+                    if (in_array($key, $fieldsToPopulate)) {
+                        $populated = [];
+                        foreach ($value as $relatedId) {
+                            if (is_numeric($relatedId)) {
+                                $related = fetchRelatedContent($db, $registry, (int) $relatedId);
+                                if ($related) {
+                                    $populated[] = $related;
+                                }
+                            }
+                        }
+                        if (!empty($populated)) {
+                            $fields[$key] = $populated;
+                        }
+                    }
+                } else {
+                    // It's a repeater - recursively process each item
+                    foreach ($value as $index => $item) {
+                        if (is_array($item)) {
+                            $fields[$key][$index] = populateNestedRelationships($item, $fieldsToPopulate, $db, $registry);
+                        }
                     }
                 }
             }

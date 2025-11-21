@@ -40,7 +40,7 @@ function handlePublicRoutes(string $method, string $path, Database $db, ContentT
             sendError("Content type '{$type}' not found", 404);
         }
 
-        $contentType = new ContentType($db, $type, $registry->get($type));
+        $contentType = new ContentType($db, $type, $registry->get($type), $blocks);
 
         try {
             if ($slug) {

@@ -18,7 +18,7 @@ use Edit\Core\ContentTypes\ContentType;
  * - GET /{type}/:id/revisions - Get revisions for content item
  * - POST /{type}/:id/revisions/:revision_id/restore - Restore a revision
  */
-function handleContentRoutes(string $method, string $path, Database $db, ContentTypeRegistry $registry, int $userId): bool
+function handleContentRoutes(string $method, string $path, Database $db, ContentTypeRegistry $registry, $blocks, int $userId): bool
 {
     // Check for revision routes first
     if (preg_match('#^/([a-z_-]+)/(\d+)/revisions(/(\d+)/restore)?$#', $path, $matches)) {
@@ -41,7 +41,7 @@ function handleContentRoutes(string $method, string $path, Database $db, Content
             sendError("Content type '{$type}' not found", 404);
         }
 
-        $contentType = new ContentType($db, $type, $registry->get($type));
+        $contentType = new ContentType($db, $type, $registry->get($type), $blocks);
 
         try {
             if ($isRestore && $method === 'POST') {
@@ -84,7 +84,7 @@ function handleContentRoutes(string $method, string $path, Database $db, Content
             sendError("Content type '{$type}' not found", 404);
         }
 
-        $contentType = new ContentType($db, $type, $registry->get($type));
+        $contentType = new ContentType($db, $type, $registry->get($type), $blocks);
 
         try {
             switch ($method) {

@@ -259,8 +259,6 @@ async function saveContent() {
       normalizedForm.fields = normalizeMediaFields(normalizedForm.fields)
     }
 
-    console.log('Saving content with normalized fields:', normalizedForm.fields)
-
     const result = await apiRequest(method, url, normalizedForm)
 
     if (isCreating.value && result.id) {

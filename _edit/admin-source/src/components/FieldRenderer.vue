@@ -94,7 +94,7 @@
 
     <!-- Relationship Field -->
     <select v-else-if="field.type === 'relationship'"
-            :value="modelValue"
+            :value="typeof modelValue === 'object' && modelValue?.id ? modelValue.id : modelValue"
             :required="field.required"
             @focus="$emit('loadRelationship', field.config?.post_type)"
             @change="$emit('update:modelValue', $event.target.value)"
