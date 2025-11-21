@@ -104,7 +104,6 @@ function handleConfigRoutes(string $method, string $path, ContentTypeRegistry $r
         }
 
         header('Content-Type: application/json');
-        header('Content-Disposition: attachment; filename="' . basename($file) . '"');
         echo file_get_contents($file);
         exit;
     }

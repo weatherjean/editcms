@@ -73,9 +73,6 @@
                       <button @click="editPostType(module)" class="btn btn-ghost btn-sm join-item tooltip tooltip-left" data-tip="Edit">
                         <IconEdit />
                       </button>
-                      <button @click="downloadFile('modules', module.file.name)" class="btn btn-ghost btn-sm join-item tooltip tooltip-left" data-tip="Download">
-                        <IconDownload />
-                      </button>
                       <button @click="confirmDelete('modules', module.file)" class="btn btn-ghost btn-error btn-sm join-item tooltip tooltip-left" data-tip="Delete">
                         <IconTrash />
                       </button>
@@ -134,9 +131,6 @@
                       <button @click="editFieldGroup(fg)" class="btn btn-ghost btn-sm join-item tooltip tooltip-left" data-tip="Edit">
                         <IconEdit />
                       </button>
-                      <button @click="downloadFile('field-groups', fg.file.name)" class="btn btn-ghost btn-sm join-item tooltip tooltip-left" data-tip="Download">
-                        <IconDownload />
-                      </button>
                       <button @click="confirmDelete('field-groups', fg.file)" class="btn btn-ghost btn-error btn-sm join-item tooltip tooltip-left" data-tip="Delete">
                         <IconTrash />
                       </button>
@@ -191,9 +185,6 @@
                       <button @click="editBlock(block)" class="btn btn-ghost btn-sm join-item tooltip tooltip-left" data-tip="Edit">
                         <IconEdit />
                       </button>
-                      <button @click="downloadFile('blocks', block.file.name)" class="btn btn-ghost btn-sm join-item tooltip tooltip-left" data-tip="Download">
-                        <IconDownload />
-                      </button>
                       <button @click="confirmDelete('blocks', block.file)" class="btn btn-ghost btn-error btn-sm join-item tooltip tooltip-left" data-tip="Delete">
                         <IconTrash />
                       </button>
@@ -246,7 +237,6 @@ import PostTypeEditor from '../components/PostTypeEditor.vue'
 import FieldGroupEditor from '../components/FieldGroupEditor.vue'
 import BlockEditor from '../components/BlockEditor.vue'
 import IconEdit from '../components/icons/IconEdit.vue'
-import IconDownload from '../components/icons/IconDownload.vue'
 import IconTrash from '../components/icons/IconTrash.vue'
 
 const { apiRequest } = useApi()
@@ -338,28 +328,6 @@ function createBlock() {
 
 function editBlock(block) {
   blockEditorRef.value?.open(block.data)
-}
-async function downloadFile(type, name) {
-  try {
-    const response = await fetch(`/_edit/admin-api/config/${type}/${name}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('edit_token')}`
-      }
-    })
-
-    if (!response.ok) throw new Error('Download failed')
-
-    const blob = await response.blob()
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${name}.json`
-    link.click()
-    window.URL.revokeObjectURL(url)
-    showSuccess('File downloaded successfully!')
-  } catch (err) {
-    showError(err.message || 'Download failed')
-  }
 }
 
 async function exportAll() {
