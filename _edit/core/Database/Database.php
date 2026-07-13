@@ -40,6 +40,9 @@ class Database
             );
 
             $this->pdo->exec('PRAGMA foreign_keys = ON');
+            // Use the same finite-number conversion as field validation. Invalid legacy
+            // metadata becomes NULL instead of being silently cast to zero.
+            $this->pdo->sqliteCreateFunction('edit_number', [\Edit\Core\Fields\NumberField::class, 'parse'], 1);
         } catch (PDOException $e) {
             throw new \RuntimeException("Database connection failed: {$e->getMessage()}");
         }
@@ -58,6 +61,29 @@ class Database
         } else {
             $this->runMigrations();
         }
+
+        // Existing installations keep their administrator access. Recheck under
+        // a write lock only when the additive migration is needed.
+        if (!in_array('role', array_column($this->query('PRAGMA table_info(users)'), 'name'), true)) {
+            $this->pdo->exec('BEGIN IMMEDIATE');
+            try {
+                if (!in_array('role', array_column($this->query('PRAGMA table_info(users)'), 'name'), true)) {
+                    $this->execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin' CHECK(role IN ('admin','editor'))");
+                }
+                $this->pdo->exec('COMMIT');
+            } catch (\Throwable $e) {
+                $this->pdo->exec('ROLLBACK');
+                throw $e;
+            }
+        }
+
+        // Used by both fresh installations and upgrades. Issued challenges are
+        // deleted atomically when consumed, so a proof can only be accepted once.
+        $this->execute('CREATE TABLE IF NOT EXISTS captcha_challenges (
+            signature_hash TEXT PRIMARY KEY,
+            expires_at INTEGER NOT NULL
+        )');
+        $this->execute('CREATE INDEX IF NOT EXISTS idx_captcha_expires ON captcha_challenges(expires_at)');
     }
 
     private function runMigrations(): void
@@ -241,6 +267,7 @@ class Database
                     email TEXT UNIQUE NOT NULL,
                     password TEXT NOT NULL,
                     name TEXT,
+                    role TEXT NOT NULL DEFAULT 'admin' CHECK(role IN ('admin','editor')),
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             ");
@@ -281,6 +308,10 @@ class Database
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     to_address TEXT NOT NULL,
                     subject TEXT NOT NULL,
+                    message TEXT,
+                    from_name TEXT,
+                    reply_to TEXT,
+                    is_html INTEGER DEFAULT 0,
                     success INTEGER DEFAULT 0,
                     error_message TEXT,
                     ip_address TEXT,

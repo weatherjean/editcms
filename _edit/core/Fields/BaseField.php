@@ -43,7 +43,7 @@ abstract class BaseField implements FieldType
      */
     public function validate(mixed $value, array $config): bool
     {
-        if ($this->isRequired($config) && empty($value)) {
+        if ($this->isRequired($config) && ($value === null || $value === '' || $value === [] || (is_string($value) && trim($value) === ''))) {
             return false;
         }
         return true;

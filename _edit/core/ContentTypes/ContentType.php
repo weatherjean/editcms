@@ -14,7 +14,7 @@ class ContentType
     private array $fieldInstances = [];
     private $blockRegistry = null;
 
-    public function __construct(Database $db, string $type, array $config, $blockRegistry = null)
+    public function __construct(Database $db, string $type, array $config, $blockRegistry = null, private bool $resolveReferences = true)
     {
         $this->db = $db;
         $this->type = $type;
@@ -28,8 +28,11 @@ class ContentType
      */
     private function initializeFields(): void
     {
-        foreach ($this->config['fields'] as $fieldKey => $fieldConfig) {
+        foreach (ContentSchema::fields($this->config) as $fieldKey => $fieldConfig) {
             $fieldType = $fieldConfig['type'];
+            if ($fieldType === 'flexible_content') {
+                continue;
+            }
             $className = 'Edit\\Core\\Fields\\' . ucfirst($fieldType) . 'Field';
 
             if (class_exists($className)) {
@@ -48,20 +51,25 @@ class ContentType
         try {
             // Extract core fields
             $slug = $data['slug'] ?? null;
-            $status = $data['status'] ?? 'draft';
+            $status = array_key_exists('status', $data) ? $data['status'] : 'draft';
             $authorId = $data['author_id'] ?? null;
 
+            $data['fields'] = (new ContentValidator($this->db, $this->blockRegistry))->validate(array_key_exists('fields', $data) ? $data['fields'] : [], $this->config, $status === 'published');
+            if (!in_array($status, ['draft', 'published'], true)) {
+                throw new \InvalidArgumentException('Invalid content status');
+            }
+
             // Slug is required and must be URL-safe
-            if (empty($slug)) {
-                throw new \RuntimeException("Slug is required");
+            if (!is_string($slug) || $slug === '') {
+                throw new \InvalidArgumentException("Slug is required");
             }
             if (!preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug)) {
-                throw new \RuntimeException("Slug must contain only lowercase letters, numbers, and hyphens (no spaces or special characters)");
+                throw new \InvalidArgumentException("Slug must contain only lowercase letters, numbers, and hyphens (no spaces or special characters)");
             }
 
             // Ensure slug uniqueness for this content type
             if ($this->slugExists($slug)) {
-                throw new \RuntimeException("Slug already exists for this content type");
+                throw new \InvalidArgumentException("Slug already exists for this content type");
             }
 
             $contentId = $this->db->table('content')->insert([
@@ -78,14 +86,14 @@ class ContentType
 
             $this->db->commit();
             return $contentId;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             try {
                 $this->db->rollback();
             } catch (\Exception $rollbackEx) {
                 // Log rollback failure but don't mask original error
                 error_log("Rollback failed: " . $rollbackEx->getMessage());
             }
-            throw new \RuntimeException("Failed to create content: {$e->getMessage()}");
+            throw $e;
         }
     }
 
@@ -94,86 +102,102 @@ class ContentType
      */
     public function update(int $id, array $data): bool
     {
-        $this->db->beginTransaction();
+        return $this->transaction(fn () => $this->updateRecord($id, $data));
+    }
 
-        try {
-            // Get current content before updating (for revision snapshot)
-            $currentContent = $this->db->table('content')
-                ->where('id', $id)
+    /** Called only inside the transaction owned by update or restore. */
+    private function updateRecord(int $id, array $data): bool
+    {
+        // Get current content before updating (for revision snapshot)
+        $currentContent = $this->db->table('content')
+            ->where('id', $id)
+            ->where('type', $this->type)
+            ->first();
+
+        if (!$currentContent) {
+            throw new \OutOfBoundsException("Content not found");
+        }
+
+        $status = array_key_exists('status', $data) ? $data['status'] : $currentContent['status'];
+        if (!in_array($status, ['draft', 'published'], true)) {
+            throw new \InvalidArgumentException('Invalid content status');
+        }
+        $fields = array_key_exists('fields', $data) ? $data['fields'] : $this->getMeta($id);
+        $validated = (new ContentValidator($this->db, $this->blockRegistry))->validate($fields, $this->config, $status === 'published');
+        if (array_key_exists('fields', $data)) {
+            $data['fields'] = $validated;
+        }
+
+        // Build update data for core fields
+        $updateData = [];
+
+        if (array_key_exists('slug', $data)) {
+            // Slug is required and cannot be empty
+            if (!is_string($data['slug']) || $data['slug'] === '') {
+                throw new \InvalidArgumentException("Slug is required and cannot be empty");
+            }
+            // Validate slug format
+            if (!preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $data['slug'])) {
+                throw new \InvalidArgumentException("Slug must contain only lowercase letters, numbers, and hyphens (no spaces or special characters)");
+            }
+
+            // Check slug uniqueness (excluding current item)
+            $count = $this->db->table('content')
                 ->where('type', $this->type)
-                ->first();
+                ->where('slug', $data['slug'])
+                ->where('id', '!=', $id)
+                ->count();
 
-            if (!$currentContent) {
-                throw new \RuntimeException("Content not found");
+            if ($count > 0) {
+                throw new \InvalidArgumentException("Slug already exists for this content type");
             }
+            $updateData['slug'] = $data['slug'];
+        }
 
-            // Build update data for core fields
-            $updateData = [];
+        if (isset($data['status'])) {
+            $updateData['status'] = $data['status'];
+        }
 
-            if (isset($data['slug'])) {
-                // Slug is required and cannot be empty
-                if (empty($data['slug'])) {
-                    throw new \RuntimeException("Slug is required and cannot be empty");
-                }
-                // Validate slug format
-                if (!preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $data['slug'])) {
-                    throw new \RuntimeException("Slug must contain only lowercase letters, numbers, and hyphens (no spaces or special characters)");
-                }
+        if (isset($data['author_id'])) {
+            $updateData['author_id'] = $data['author_id'];
+        }
 
-                // Check slug uniqueness (excluding current item)
-                $count = $this->db->table('content')
-                    ->where('type', $this->type)
-                    ->where('slug', $data['slug'])
-                    ->where('id', '!=', $id)
-                    ->count();
+        // Always update timestamp
+        // Note: QueryBuilder doesn't support CURRENT_TIMESTAMP directly, so we use PHP
+        $updateData['updated_at'] = now();
 
-                if ($count > 0) {
-                    throw new \RuntimeException("Slug already exists for this content type");
-                }
-                $updateData['slug'] = $data['slug'];
-            }
+        // Create revision snapshot before updating
+        $this->createRevision($id, $currentContent);
 
-            if (isset($data['status'])) {
-                $updateData['status'] = $data['status'];
-            }
+        if (!empty($updateData)) {
+            $this->db->table('content')
+                ->where('id', $id)
+                ->update($updateData);
+        }
 
-            if (isset($data['author_id'])) {
-                $updateData['author_id'] = $data['author_id'];
-            }
+        if (isset($data['fields'])) {
+            $this->db->table('content_meta')
+                ->where('content_id', $id)
+                ->delete();
+            $this->saveMeta($id, $data['fields']);
+        }
 
-            // Always update timestamp
-            // Note: QueryBuilder doesn't support CURRENT_TIMESTAMP directly, so we use PHP
-            $updateData['updated_at'] = now();
+        // Cleanup old revisions (keep last 10)
+        $this->cleanupOldRevisions($id);
 
-            // Create revision snapshot before updating
-            $this->createRevision($id, $currentContent);
+        return true;
+    }
 
-            if (!empty($updateData)) {
-                $this->db->table('content')
-                    ->where('id', $id)
-                    ->update($updateData);
-            }
-
-            if (isset($data['fields'])) {
-                $this->db->table('content_meta')
-                    ->where('content_id', $id)
-                    ->delete();
-                $this->saveMeta($id, $data['fields']);
-            }
-
-            // Cleanup old revisions (keep last 10)
-            $this->cleanupOldRevisions($id);
-
+    private function transaction(callable $operation): bool
+    {
+        $this->db->beginTransaction();
+        try {
+            $result = $operation();
             $this->db->commit();
-            return true;
-        } catch (\Exception $e) {
-            try {
-                $this->db->rollback();
-            } catch (\Exception $rollbackEx) {
-                // Log rollback failure but don't mask original error
-                error_log("Rollback failed: " . $rollbackEx->getMessage());
-            }
-            throw new \RuntimeException("Failed to update content: {$e->getMessage()}");
+            return $result;
+        } catch (\Throwable $e) {
+            $this->db->rollback();
+            throw $e;
         }
     }
 
@@ -189,7 +213,7 @@ class ContentType
                 ->where('type', $this->type)
                 ->delete();
             return true;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             throw new \RuntimeException("Failed to delete content: {$e->getMessage()}");
         }
     }
@@ -211,7 +235,9 @@ class ContentType
         $result['fields'] = $this->getMeta($id);
 
         // Populate relationships
-        $result = $this->populateRelationships($result);
+        if ($this->resolveReferences) {
+            $result = $this->populateRelationships($result);
+        }
 
         return $result;
     }
@@ -243,7 +269,18 @@ class ContentType
         // Apply ordering
         $orderBy = $filters['order_by'] ?? 'created_at';
         $orderDir = $filters['order_dir'] ?? 'DESC';
-        $query->orderBy($orderBy, $orderDir);
+        $orderDir = strtoupper($orderDir);
+        if (!in_array($orderDir, ['ASC', 'DESC'], true)) {
+            throw new \InvalidArgumentException('Invalid sort direction');
+        }
+        if (in_array($orderBy, ContentQuery::CORE_SORTS, true)) {
+            $query->orderByExpression('content.' . $orderBy . ' ' . $orderDir . ', content.id ASC');
+        } else {
+            [$path,$field] = ContentQuery::field($this->config, $orderBy, !$this->resolveReferences);
+            $value = ContentQuery::expression($field, 'sort_meta.meta_value');
+            $expression = "(SELECT {$value} FROM content_meta sort_meta WHERE sort_meta.content_id = content.id AND sort_meta.meta_key = ? LIMIT 1)";
+            $query->orderByExpression("{$expression} IS NULL ASC, {$expression} {$orderDir}, content.id ASC", [$path, $path]);
+        }
 
         // Apply pagination
         if (isset($filters['limit'])) {
@@ -265,7 +302,9 @@ class ContentType
             // Populate meta and relationships for each item
             foreach ($results as &$item) {
                 $item['fields'] = $allMeta[(int)$item['id']] ?? [];
-                $item = $this->populateRelationships($item);
+                if ($this->resolveReferences) {
+                    $item = $this->populateRelationships($item);
+                }
             }
         }
 
@@ -336,31 +375,10 @@ class ContentType
     {
         $dbValue = $value;
 
-        // If field has a Field class instance, use it for validation/sanitization
-        if (isset($this->fieldInstances[$fieldKey]) && isset($this->config['fields'][$fieldKey])) {
-            $fieldInstance = $this->fieldInstances[$fieldKey];
-            $fieldConfig = $this->config['fields'][$fieldKey];
-
-            // Validate
-            if (!$fieldInstance->validate($value, $fieldConfig)) {
-                error_log("Validation failed for field '{$fieldKey}': " . json_encode([
-                    'value' => $value,
-                    'type' => gettype($value),
-                    'config' => $fieldConfig
-                ]));
-                throw new \RuntimeException("Validation failed for field '{$fieldKey}'");
-            }
-
-            // Sanitize
-            $sanitized = $fieldInstance->sanitize($value, $fieldConfig);
-
-            // Convert to database format
-            $dbValue = $fieldInstance->toDatabase($sanitized);
-        } else {
-            // For fields without Field classes, just JSON encode arrays/objects
-            if (is_array($value) || is_object($value)) {
-                $dbValue = json_encode($value);
-            }
+        if (isset($this->fieldInstances[$dbKey])) {
+            $dbValue = $this->fieldInstances[$dbKey]->toDatabase($value);
+        } elseif (is_array($value)) {
+            $dbValue = json_encode($value, JSON_THROW_ON_ERROR);
         }
 
         $this->db->table('content_meta')->insert([
@@ -419,8 +437,8 @@ class ContentType
                 }
 
                 // Deserialize using field instance
-                if (isset($this->fieldInstances[$fieldKey])) {
-                    $fieldInstance = $this->fieldInstances[$fieldKey];
+                if (isset($this->fieldInstances[$dbKey])) {
+                    $fieldInstance = $this->fieldInstances[$dbKey];
                     $fields[$fieldGroupKey][$fieldKey] = $fieldInstance->fromDatabase($value);
                 } else {
                     $fields[$fieldGroupKey][$fieldKey] = $value;
@@ -446,7 +464,7 @@ class ContentType
             }
         }
 
-        return $fields;
+        return ContentHtml::clean($fields, $this->config, $this->blockRegistry);
     }
 
     /**
@@ -490,8 +508,8 @@ class ContentType
                 }
 
                 // Deserialize using field instance
-                if (isset($this->fieldInstances[$fieldKey])) {
-                    $fieldInstance = $this->fieldInstances[$fieldKey];
+                if (isset($this->fieldInstances[$dbKey])) {
+                    $fieldInstance = $this->fieldInstances[$dbKey];
                     $result[$contentId][$fieldGroupKey][$fieldKey] = $fieldInstance->fromDatabase($value);
                 } else {
                     $result[$contentId][$fieldGroupKey][$fieldKey] = $value;
@@ -524,6 +542,9 @@ class ContentType
             }
         }
 
+        foreach ($result as &$fields) {
+            $fields = ContentHtml::clean($fields, $this->config, $this->blockRegistry);
+        }
         return $result;
     }
 
@@ -595,7 +616,7 @@ class ContentType
                     }
                 }
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             error_log("Error in populateRelationships: " . $e->getMessage());
         }
 
@@ -732,7 +753,7 @@ class ContentType
                     }
                 }
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             error_log("Failed to populate field {$fieldKey}: " . $e->getMessage());
         }
 
@@ -783,27 +804,16 @@ class ContentType
      */
     private function applyFieldFilters($query, array $filters): void
     {
-        if (isset($filters['field_filters']) && !empty($filters['field_filters'])) {
-            foreach ($filters['field_filters'] as $index => $filter) {
-                $alias = "m{$index}";
-
-                // Build subquery for EXISTS clause
-                if ($filter['operator'] === 'LIKE') {
-                    $subquery = "SELECT 1 FROM content_meta {$alias} " .
-                               "WHERE {$alias}.content_id = content.id " .
-                               "AND {$alias}.meta_key = ? " .
-                               "AND {$alias}.meta_value LIKE ?";
-                    $bindings = [$filter['key'], '%' . $filter['value'] . '%'];
-                } else {
-                    $subquery = "SELECT 1 FROM content_meta {$alias} " .
-                               "WHERE {$alias}.content_id = content.id " .
-                               "AND {$alias}.meta_key = ? " .
-                               "AND {$alias}.meta_value {$filter['operator']} ?";
-                    $bindings = [$filter['key'], $filter['value']];
-                }
-
-                $query->whereExists($subquery, $bindings);
+        foreach ($filters['field_filters'] ?? [] as $filter) {
+            [$path,$field] = ContentQuery::field($this->config, $filter['key'], !$this->resolveReferences);
+            $operator = $filter['operator'];
+            $value = ContentQuery::value($filter['value'], $field, $operator);
+            $left = ContentQuery::expression($field, 'm.meta_value');
+            $right = ContentQuery::expression($field, '?');
+            if ($operator === 'LIKE') {
+                $value = '%' . $value . '%';
             }
+            $query->whereExists("SELECT 1 FROM content_meta m WHERE m.content_id = content.id AND m.meta_key = ? AND {$left} {$operator} {$right}", [$path, $value]);
         }
     }
 
@@ -839,7 +849,7 @@ class ContentType
             'revision_number' => $nextRevisionNumber,
             'slug' => $currentContent['slug'],
             'status' => $currentContent['status'],
-            'fields' => json_encode($currentFields),
+            'fields' => json_encode($currentFields, JSON_THROW_ON_ERROR),
             'author_id' => $currentContent['author_id']
         ]);
     }
@@ -860,7 +870,7 @@ class ContentType
 
             // Get IDs of oldest revisions to delete
             $oldRevisions = $this->db->query(
-                "SELECT id FROM content_revisions WHERE content_id = ? ORDER BY created_at ASC LIMIT ?",
+                "SELECT id FROM content_revisions WHERE content_id = ? ORDER BY revision_number ASC, id ASC LIMIT ?",
                 [$contentId, $toDelete]
             );
 
@@ -885,14 +895,14 @@ class ContentType
             "SELECT r.*, u.name as author_name
              FROM content_revisions r
              LEFT JOIN users u ON r.author_id = u.id
-             WHERE r.content_id = ?
+             WHERE r.content_id = ? AND EXISTS (SELECT 1 FROM content c WHERE c.id = r.content_id AND c.type = ?)
              ORDER BY r.revision_number DESC",
-            [$contentId]
+            [$contentId, $this->type]
         );
 
         // Decode fields JSON for each revision
         foreach ($revisions as &$revision) {
-            $revision['fields'] = json_decode($revision['fields'], true) ?? [];
+            $revision['fields'] = ContentHtml::clean(json_decode($revision['fields'], true) ?? [], $this->config, $this->blockRegistry);
         }
 
         return $revisions;
@@ -903,38 +913,17 @@ class ContentType
      */
     public function restoreRevision(int $contentId, int $revisionId): bool
     {
-        $this->db->beginTransaction();
-
-        try {
-            // Get the revision to restore
-            $revision = $this->db->table('content_revisions')
-                ->where('id', $revisionId)
-                ->where('content_id', $contentId)
-                ->first();
-
+        return $this->transaction(function () use ($contentId, $revisionId): bool {
+            $revision = $this->db->table('content_revisions')->where('id', $revisionId)->where('content_id', $contentId)->first();
             if (!$revision) {
-                throw new \RuntimeException("Revision not found");
+                throw new \InvalidArgumentException('Revision not found');
             }
-
-            // Decode fields
-            $fields = json_decode($revision['fields'], true) ?? [];
-
-            // Update content with revision data
-            $this->update($contentId, [
-                'slug' => $revision['slug'],
-                'status' => $revision['status'],
-                'fields' => $fields
+            $fields = json_decode($revision['fields'], true, 64, JSON_THROW_ON_ERROR);
+            // Validate against the current schema. Incompatible old snapshots fail
+            // atomically and remain available for manual recovery.
+            return $this->updateRecord($contentId, [
+                'slug' => $revision['slug'], 'status' => $revision['status'], 'fields' => $fields,
             ]);
-
-            $this->db->commit();
-            return true;
-        } catch (\Exception $e) {
-            try {
-                $this->db->rollback();
-            } catch (\Exception $rollbackEx) {
-                error_log("Rollback failed: " . $rollbackEx->getMessage());
-            }
-            throw new \RuntimeException("Failed to restore revision: {$e->getMessage()}");
-        }
+        });
     }
 }

@@ -16,7 +16,7 @@ class BlockRegistry
 
     public function __construct(string $configPath)
     {
-        $this->blocksPath = $configPath . '/blocks';
+        $this->blocksPath = \Edit\Core\Configuration\Store::resolve($configPath) . '/blocks';
     }
 
     /**

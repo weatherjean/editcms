@@ -18,7 +18,6 @@ class HtmlField extends BaseField
 
     public function sanitize(mixed $value, array $config): mixed
     {
-        // Allow HTML tags for HTML content
-        return $value;
+        return \Edit\Core\Security\HtmlSanitizer::clean((string)($value ?? ''));
     }
 }

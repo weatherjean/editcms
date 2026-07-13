@@ -12,9 +12,10 @@ class SelectField extends BaseField
             return false;
         }
 
-        // Check if value is in allowed options
-        if (!empty($value) && isset($config['options'])) {
-            return in_array($value, $config['options'], true);
+        if ($value !== null && $value !== '') {
+            $choices = $config['config']['choices'] ?? $config['choices'] ?? null;
+            $options = $choices !== null ? array_map('strval', array_keys($choices)) : ($config['options'] ?? []);
+            return in_array($value, $options, true);
         }
 
         return true;

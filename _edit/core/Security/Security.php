@@ -17,7 +17,6 @@ class Security
         'image/png',
         'image/gif',
         'image/webp',
-        'image/svg+xml',
         // Documents
         'application/pdf',
         'application/msword',
@@ -33,6 +32,20 @@ class Security
         'audio/ogg',
         'audio/wav',
     ];
+
+    public static function uploadExtension(string $mime): ?string
+    {
+        return [
+            'image/jpeg' => 'jpg', 'image/jpg' => 'jpg', 'image/png' => 'png',
+            'image/gif' => 'gif', 'image/webp' => 'webp', 'application/pdf' => 'pdf',
+            'application/msword' => 'doc',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+            'application/vnd.ms-excel' => 'xls',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+            'video/mp4' => 'mp4', 'video/webm' => 'webm', 'video/ogg' => 'ogg',
+            'audio/mpeg' => 'mp3', 'audio/ogg' => 'oga', 'audio/wav' => 'wav',
+        ][$mime] ?? null;
+    }
 
     /**
      * Validate uploaded file
@@ -74,14 +87,6 @@ class Security
             }
         }
 
-        // Additional validation for SVG (XSS risk)
-        if ($mimeType === 'image/svg+xml') {
-            $svgValidation = self::validateSVG($file['tmp_name']);
-            if (!$svgValidation['valid']) {
-                return $svgValidation;
-            }
-        }
-
         return ['valid' => true, 'error' => null, 'mime' => $mimeType];
     }
 
@@ -90,11 +95,6 @@ class Security
      */
     private static function validateImage(string $filePath, string $mimeType): array
     {
-        // Skip SVG (handled separately)
-        if ($mimeType === 'image/svg+xml') {
-            return ['valid' => true, 'error' => null, 'mime' => $mimeType];
-        }
-
         $imageInfo = @getimagesize($filePath);
         if ($imageInfo === false) {
             return ['valid' => false, 'error' => 'Invalid image file', 'mime' => $mimeType];
@@ -115,32 +115,6 @@ class Security
     }
 
     /**
-     * Validate SVG file for XSS vulnerabilities
-     */
-    private static function validateSVG(string $filePath): array
-    {
-        $content = file_get_contents($filePath);
-
-        // Check for dangerous elements/attributes
-        $dangerousPatterns = [
-            '/<script/i',
-            '/javascript:/i',
-            '/on\w+\s*=/i', // Event handlers like onclick, onload, etc.
-            '/<iframe/i',
-            '/<embed/i',
-            '/<object/i',
-        ];
-
-        foreach ($dangerousPatterns as $pattern) {
-            if (preg_match($pattern, $content)) {
-                return ['valid' => false, 'error' => 'SVG file contains potentially malicious content', 'mime' => 'image/svg+xml'];
-            }
-        }
-
-        return ['valid' => true, 'error' => null, 'mime' => 'image/svg+xml'];
-    }
-
-    /**
      * Sanitize HTML content (for email, wysiwyg fields)
      * Strips dangerous tags and attributes while preserving safe formatting
      *
@@ -149,92 +123,7 @@ class Security
      */
     public static function sanitizeHTML(string $html): string
     {
-        // Allowed tags - basic formatting only
-        $allowedTags = [
-            'p', 'br', 'strong', 'b', 'em', 'i', 'u', 'a', 'ul', 'ol', 'li',
-            'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre',
-            'span', 'div', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'
-        ];
-
-        // Allowed attributes per tag
-        $allowedAttrs = [
-            'a' => ['href', 'title', 'target'],
-            'img' => ['src', 'alt', 'title', 'width', 'height'],
-            'span' => ['style'],
-            'div' => ['style'],
-            'td' => ['colspan', 'rowspan'],
-            'th' => ['colspan', 'rowspan'],
-        ];
-
-        // Load HTML into DOMDocument
-        $dom = new \DOMDocument();
-        // Suppress warnings for malformed HTML
-        @$dom->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-
-        // Remove dangerous elements
-        $dangerousTags = ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'style', 'link', 'meta'];
-        foreach ($dangerousTags as $tag) {
-            $elements = $dom->getElementsByTagName($tag);
-            $toRemove = [];
-            foreach ($elements as $element) {
-                $toRemove[] = $element;
-            }
-            foreach ($toRemove as $element) {
-                $element->parentNode->removeChild($element);
-            }
-        }
-
-        // Clean attributes on all elements
-        $xpath = new \DOMXPath($dom);
-        $allElements = $xpath->query('//*');
-
-        foreach ($allElements as $element) {
-            $tagName = strtolower($element->tagName);
-
-            // Remove element if not in allowed list
-            if (!in_array($tagName, $allowedTags)) {
-                $element->parentNode->removeChild($element);
-                continue;
-            }
-
-            // Clean attributes
-            $attributes = $element->attributes;
-            $toRemove = [];
-
-            foreach ($attributes as $attr) {
-                $attrName = strtolower($attr->name);
-
-                // Remove event handlers
-                if (strpos($attrName, 'on') === 0) {
-                    $toRemove[] = $attrName;
-                    continue;
-                }
-
-                // Remove javascript: URLs
-                if (in_array($attrName, ['href', 'src']) && stripos($attr->value, 'javascript:') === 0) {
-                    $toRemove[] = $attrName;
-                    continue;
-                }
-
-                // Check if attribute is allowed for this tag
-                $tagAllowedAttrs = $allowedAttrs[$tagName] ?? [];
-                if (!in_array($attrName, $tagAllowedAttrs)) {
-                    $toRemove[] = $attrName;
-                }
-            }
-
-            foreach ($toRemove as $attrName) {
-                $element->removeAttribute($attrName);
-            }
-        }
-
-        // Return cleaned HTML
-        $clean = $dom->saveHTML();
-
-        // Remove XML encoding declaration added earlier
-        $clean = str_replace('<?xml encoding="UTF-8">', '', $clean);
-
-        return $clean;
+        return HtmlSanitizer::clean($html);
     }
 
     /**

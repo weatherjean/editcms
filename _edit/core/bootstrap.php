@@ -10,12 +10,22 @@ declare(strict_types=1);
 // Define base path - points to _edit/ root
 define('EDIT_BASE_PATH', dirname(__DIR__));
 
+require_once __DIR__ . '/Operations/Maintenance.php';
+\Edit\Core\Operations\Maintenance::enter(EDIT_BASE_PATH);
+
 // Load configuration
 $configFile = EDIT_BASE_PATH . '/config.php';
 if (!file_exists($configFile)) {
-    // Auto-generate secure config.php with random encryption key
-    $encryptionKey = bin2hex(random_bytes(32));
-    $configContent = <<<PHP
+    $configLock = @fopen(EDIT_BASE_PATH . '/data/.config.lock', 'c');
+    if (!$configLock || !flock($configLock, LOCK_EX)) {
+        http_response_code(503);
+        exit('Configuration unavailable');
+    }
+    try {
+        if (!file_exists($configFile)) {
+            // Auto-generate secure config.php with random encryption key
+            $encryptionKey = bin2hex(random_bytes(32));
+            $configContent = <<<PHP
 <?php
 /**
  * _edit CMS Configuration
@@ -41,7 +51,7 @@ define('EDIT_CORS_ORIGINS', [
 define('EDIT_DATABASE_PATH', EDIT_BASE_PATH . '/data/database/site.sqlite');
 
 // Debug mode (set to false in production)
-define('EDIT_DEBUG', true);
+define('EDIT_DEBUG', false);
 
 // Session token expiry (in hours)
 define('EDIT_SESSION_EXPIRY_HOURS', 24);
@@ -62,10 +72,20 @@ define('EDIT_MAX_ZIP_UNCOMPRESSED_SIZE', 50 * 1024 * 1024); // 50MB
 define('EDIT_MAX_ZIP_FILES', 1000);
 
 PHP;
-    file_put_contents($configFile, $configContent);
+            $temporaryConfig = EDIT_BASE_PATH . '/.config-' . bin2hex(random_bytes(8)) . '.tmp';
+            if (file_put_contents($temporaryConfig, $configContent) === false || !chmod($temporaryConfig, 0600) || !rename($temporaryConfig, $configFile)) {
+                @unlink($temporaryConfig);
+                throw new \RuntimeException('Cannot initialize configuration');
+            }
+        }
+    } finally {
+        flock($configLock, LOCK_UN);
+        fclose($configLock);
+    }
 }
 
 require_once $configFile;
+\Edit\Core\Operations\Maintenance::checkRestoredDatabase(EDIT_BASE_PATH, EDIT_DATABASE_PATH);
 
 // Validate encryption key is not the default in production
 if (EDIT_ENCRYPTION_KEY === 'CHANGE_THIS_IN_PRODUCTION_USE_RANDOM_32_BYTE_HEX_STRING') {
@@ -83,6 +103,7 @@ spl_autoload_register(function ($class) {
     // Namespace mappings
     $prefixes = [
         'Edit\\Core\\' => EDIT_BASE_PATH . '/core/',
+        'AltchaOrg\\Altcha\\' => EDIT_BASE_PATH . '/core/ThirdParty/Altcha/src/',
     ];
 
     // Check each prefix

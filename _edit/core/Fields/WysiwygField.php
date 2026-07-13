@@ -18,7 +18,6 @@ class WysiwygField extends BaseField
 
     public function sanitize(mixed $value, array $config): mixed
     {
-        // Allow HTML tags for WYSIWYG content
-        return $value;
+        return \Edit\Core\Security\HtmlSanitizer::clean((string)($value ?? ''));
     }
 }
