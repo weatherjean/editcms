@@ -20,6 +20,8 @@ class QueryBuilder
     private array $bindings = [];
     private ?string $orderByColumn = null;
     private string $orderDirection = 'ASC';
+    private ?string $orderExpression = null;
+    private array $orderBindings = [];
     private ?int $limitValue = null;
     private ?int $offsetValue = null;
     private string $type = 'select'; // select, insert, update, delete
@@ -239,6 +241,14 @@ class QueryBuilder
         return $this;
     }
 
+    /** Internal SQL expressions only; never pass request text as SQL. */
+    public function orderByExpression(string $sql, array $bindings = []): self
+    {
+        $this->orderExpression = $sql;
+        $this->orderBindings = $bindings;
+        return $this;
+    }
+
     /**
      * Add LIMIT clause
      */
@@ -418,7 +428,10 @@ class QueryBuilder
         $sql .= $this->buildWhereClause();
 
         // Build ORDER BY
-        if ($this->orderByColumn !== null) {
+        if ($this->orderExpression !== null) {
+            $sql .= " ORDER BY " . $this->orderExpression;
+            $this->bindings = array_merge($this->bindings, $this->orderBindings);
+        } elseif ($this->orderByColumn !== null) {
             $sql .= sprintf(
                 " ORDER BY %s %s",
                 $this->escapeIdentifier($this->orderByColumn),

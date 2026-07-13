@@ -1,0 +1,8 @@
+{
+  "package": "ezyang/htmlpurifier",
+  "version": "4.19.0",
+  "source": "https://github.com/ezyang/htmlpurifier/tree/v4.19.0",
+  "archive_sha256": "f206fb979347acb871a093ea7fd6c9073ddc59d141f39054efbb32b22a2ea9cd",
+  "license": "LGPL-2.1-or-later",
+  "modifications": []
+}

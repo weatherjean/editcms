@@ -21,16 +21,17 @@ class RelationshipField extends BaseField
 
     public function sanitize(mixed $value, array $config): mixed
     {
-        return !empty($value) ? (int) $value : null;
+        return !empty($value) ? (int)$value : null;
     }
 
     public function toDatabase(mixed $value): string
     {
-        return (string) ($value ?? '');
+        return is_array($value) ? json_encode($value, JSON_THROW_ON_ERROR) : (string) ($value ?? '');
     }
 
     public function fromDatabase(string $value): mixed
     {
-        return !empty($value) ? (int) $value : null;
+        $decoded = json_decode($value, true);
+        return is_array($decoded) ? array_map('intval', $decoded) : (!empty($value) ? (int)$value : null);
     }
 }

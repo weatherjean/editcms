@@ -23,7 +23,7 @@ class Email {
      * @param bool $isHtml Whether the message is HTML (default: true)
      * @return bool Success status
      */
-    public function send($to, string $subject, string $message, bool $isHtml = true): bool {
+    public function send($to, string $subject, string $message, bool $isHtml = true, string $replyTo = ''): bool {
         // Check if SMTP is configured
         if (!$this->isSmtpConfigured()) {
             $this->lastError = 'SMTP is not configured. Please configure SMTP settings in the Email page.';
@@ -40,7 +40,7 @@ class Email {
             );
 
             $toAddress = is_array($to) ? $to[0] : $to; // SMTP class handles single recipient
-            $success = $smtp->send($this->fromEmail, $this->fromName, $toAddress, $subject, $message, $isHtml);
+            $success = $smtp->send($this->fromEmail, $this->fromName, $toAddress, $subject, $message, $isHtml, $replyTo);
 
             if (!$success) {
                 $this->lastError = $smtp->getLastError();

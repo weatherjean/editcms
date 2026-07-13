@@ -23,11 +23,16 @@ class SMTP {
     /**
      * Send an email via SMTP
      */
-    public function send(string $from, string $fromName, string $to, string $subject, string $message, bool $isHtml = true): bool {
+    public function send(string $from, string $fromName, string $to, string $subject, string $message, bool $isHtml = true, string $replyTo = ''): bool {
         try {
+            foreach ([$from, $fromName, $to, $subject, $replyTo] as $headerValue) {
+                if (preg_match('/[\r\n\x00]/', $headerValue)) {
+                    throw new \InvalidArgumentException('Invalid email header.');
+                }
+            }
             $this->connect();
             $this->authenticate();
-            $this->sendMail($from, $fromName, $to, $subject, $message, $isHtml);
+            $this->sendMail($from, $fromName, $to, $subject, $message, $isHtml, $replyTo);
             $this->disconnect();
             return true;
         } catch (\Exception $e) {
@@ -112,7 +117,7 @@ class SMTP {
     /**
      * Send the actual email
      */
-    private function sendMail(string $from, string $fromName, string $to, string $subject, string $message, bool $isHtml): void {
+    private function sendMail(string $from, string $fromName, string $to, string $subject, string $message, bool $isHtml, string $replyTo): void {
         // MAIL FROM
         $this->sendCommand("MAIL FROM:<{$from}>");
 
@@ -126,8 +131,12 @@ class SMTP {
         $this->sendCommand("DATA");
 
         // Build email headers and body
-        $headers = $this->buildHeaders($from, $fromName, $to, $subject, $isHtml);
-        $email = $headers . "\r\n" . $message . "\r\n.";
+        $headers = $this->buildHeaders($from, $fromName, $to, $subject, $isHtml, $replyTo);
+        // Normalize lines and dot-stuff DATA, including a visitor-supplied line
+        // containing only '.', so message text cannot become SMTP commands.
+        $message = preg_replace('/\r\n|\r|\n/', "\r\n", $message);
+        $message = preg_replace('/^\./m', '..', $message);
+        $email = $headers . "\r\n\r\n" . $message . "\r\n.";
 
         // Send email content
         $this->sendData($email);
@@ -136,7 +145,7 @@ class SMTP {
     /**
      * Build email headers
      */
-    private function buildHeaders(string $from, string $fromName, string $to, string $subject, bool $isHtml): string {
+    private function buildHeaders(string $from, string $fromName, string $to, string $subject, bool $isHtml, string $replyTo): string {
         $headers = [];
 
         // From header
@@ -148,6 +157,9 @@ class SMTP {
 
         // To header
         $headers[] = "To: {$to}";
+        if ($replyTo !== '') {
+            $headers[] = "Reply-To: {$replyTo}";
+        }
 
         // Subject
         $headers[] = "Subject: {$subject}";
@@ -190,7 +202,7 @@ class SMTP {
         $response = $this->getResponse();
 
         if (!$this->isSuccessResponse($response)) {
-            throw new \Exception("SMTP command failed [{$command}]: {$response}");
+            throw new \Exception('SMTP command rejected.');
         }
 
         return $response;

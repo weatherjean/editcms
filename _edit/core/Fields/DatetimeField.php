@@ -12,26 +12,18 @@ class DatetimeField extends BaseField
             return false;
         }
 
-        if (!empty($value)) {
-            // Accept both datetime-local format and ISO 8601
-            $formats = ['Y-m-d\TH:i', 'Y-m-d\TH:i:s', 'Y-m-d\TH:i:s\Z', 'Y-m-d H:i:s'];
-            foreach ($formats as $format) {
-                $date = \DateTime::createFromFormat($format, $value);
-                if ($date) {
-                    return true;
-                }
-            }
-
-            // Also try to parse with DateTime constructor for flexible format support
-            try {
-                new \DateTime($value);
-                return true;
-            } catch (\Exception $e) {
-                return false;
-            }
+        if ($value === null || $value === '') return true;
+        if (!is_string($value)) return false;
+        foreach (['Y-m-d\\TH:i', 'Y-m-d\\TH:i:s', 'Y-m-d\\TH:i:s\\Z', 'Y-m-d\\TH:i:sP', 'Y-m-d H:i:s'] as $format) {
+            $date = \DateTimeImmutable::createFromFormat('!' . $format, $value, new \DateTimeZone('UTC'));
+            if ($date && $date->format($format) === $value) return true;
         }
+        return false;
+    }
 
-        return true;
+    public function sanitize(mixed $value, array $config): mixed
+    {
+        return $this->toDatabase($value);
     }
 
     public function toDatabase(mixed $value): string
@@ -41,7 +33,8 @@ class DatetimeField extends BaseField
         }
 
         // Convert to ISO 8601 format for storage
-        $date = new \DateTime($value);
+        $date = new \DateTime($value, new \DateTimeZone('UTC'));
+        $date->setTimezone(new \DateTimeZone('UTC'));
         return $date->format('Y-m-d\TH:i:s\Z');
     }
 

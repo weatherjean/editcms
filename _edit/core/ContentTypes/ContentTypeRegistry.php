@@ -22,7 +22,7 @@ class ContentTypeRegistry
 
     public function __construct(?string $configPath = null)
     {
-        $this->configPath = $configPath ?? EDIT_BASE_PATH . '/data/config';
+        $this->configPath = \Edit\Core\Configuration\Store::resolve($configPath ?? EDIT_BASE_PATH . '/data/config');
     }
 
     /**
@@ -148,6 +148,7 @@ class ContentTypeRegistry
                 'description' => $postType['description'] ?? '',
                 'icon' => $postType['icon'] ?? 'file',
                 'allow_open' => $postType['allow_open'] ?? false,
+                'public' => $postType['public'] ?? true,
                 'fields' => $fields,
                 'field_groups' => array_values($assignedFieldGroups)  // Include field groups for scoping
             ];

@@ -1,0 +1,9 @@
+{
+  "package": "altcha-org/altcha",
+  "version": "2.1.0",
+  "repository": "https://github.com/altcha-org/altcha-lib-php",
+  "commit": "63038786ae51b572f8f1de5a29079bea5971dd84",
+  "archive_sha256": "6d60ee1eab4a8182ddde81f8d7f813b8e9d4408d0428f5f364c13756f8087f5f",
+  "license": "MIT",
+  "modifications": []
+}
