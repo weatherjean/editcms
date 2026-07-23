@@ -44,6 +44,7 @@ function handleContentRoutes(string $method, string $path, Database $db, Content
         $contentType = new ContentType($db, $type, $registry->get($type), $blocks);
 
         try {
+            if (!$contentType->find($contentId)) sendError('Content not found', 404);
             if ($isRestore && $method === 'POST') {
                 // Restore revision
                 if (!$revisionId) {
@@ -59,8 +60,13 @@ function handleContentRoutes(string $method, string $path, Database $db, Content
             } else {
                 sendError('Method not allowed', 405);
             }
-        } catch (\Exception $e) {
-            sendError($e->getMessage(), 500);
+        } catch (\OutOfBoundsException $e) {
+            sendError($e->getMessage(), 404);
+        } catch (\InvalidArgumentException $e) {
+            sendError($e->getMessage(), $method === 'GET' ? 400 : 422);
+        } catch (\Throwable $e) {
+            error_log('Content request failed: ' . $e->getMessage());
+            sendError('Unable to complete content request', 500);
         }
         return true;
     }
@@ -96,15 +102,12 @@ function handleContentRoutes(string $method, string $path, Database $db, Content
                         }
                         sendJson($result);
                     } else {
-                        $filters = [];
+                        $filters = \Edit\Core\ContentTypes\ContentQuery::parse($_GET, $registry->get($type), false);
+                        // Existing admin list screens load the whole collection.
+                        if (!isset($_GET['limit'])) unset($filters['limit'], $filters['offset']);
                         if (isset($_GET['status'])) {
+                            if (!in_array($_GET['status'], ['draft','published'], true)) sendError('Invalid status', 400);
                             $filters['status'] = $_GET['status'];
-                        }
-                        if (isset($_GET['limit'])) {
-                            $filters['limit'] = (int) $_GET['limit'];
-                        }
-                        if (isset($_GET['offset'])) {
-                            $filters['offset'] = (int) $_GET['offset'];
                         }
 
                         $result = $contentType->all($filters);
@@ -113,7 +116,7 @@ function handleContentRoutes(string $method, string $path, Database $db, Content
                     break;
 
                 case 'POST':
-                    $data = getJsonBody();
+                    $data = getContentJsonBody();
                     if (!$data) {
                         sendError('Invalid JSON data', 400);
                     }
@@ -130,7 +133,7 @@ function handleContentRoutes(string $method, string $path, Database $db, Content
                         sendError('ID required for update', 400);
                     }
 
-                    $data = getJsonBody();
+                    $data = getContentJsonBody();
                     if (!$data) {
                         sendError('Invalid JSON data', 400);
                     }
@@ -152,11 +155,30 @@ function handleContentRoutes(string $method, string $path, Database $db, Content
                 default:
                     sendError('Method not allowed', 405);
             }
-        } catch (\Exception $e) {
-            sendError($e->getMessage(), 500);
+        } catch (\OutOfBoundsException $e) {
+            sendError($e->getMessage(), 404);
+        } catch (\InvalidArgumentException $e) {
+            sendError($e->getMessage(), $method === 'GET' ? 400 : 422);
+        } catch (\Throwable $e) {
+            error_log('Content request failed: ' . $e->getMessage());
+            sendError('Unable to complete content request', 500);
         }
         return true;
     }
 
     return false;
+}
+
+/** Bound content requests before decoding; preserve field-specific 422 errors. */
+function getContentJsonBody(): array
+{
+    $input = file_get_contents('php://input', false, null, 0, 2097153);
+    if (strlen($input) > 2097152) sendError('Content request is too large', 413);
+    try {
+        $data = json_decode($input, true, 64, JSON_THROW_ON_ERROR);
+    } catch (\JsonException $e) {
+        sendError('Invalid JSON data', 400);
+    }
+    if (!is_array($data) || array_is_list($data)) sendError('Content request must be a JSON object', 400);
+    return $data;
 }

@@ -23,6 +23,10 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
 
         $file = $_FILES['file'];
 
+        if (!is_array($file) || !is_int($file['error'] ?? null) || !is_string($file['tmp_name'] ?? null) || !is_string($file['name'] ?? null) || !is_int($file['size'] ?? null)) {
+            sendError('Invalid upload', 400);
+        }
+
         if ($file['error'] !== UPLOAD_ERR_OK) {
             $errorMessages = [
                 UPLOAD_ERR_INI_SIZE => 'File exceeds upload_max_filesize',
@@ -47,8 +51,9 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
             mkdir($uploadDir, 0755, true);
         }
 
-        $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-        $filename = uniqid() . '.' . $extension;
+        $extension = Security::uploadExtension($validation['mime']);
+        if ($extension === null) sendError('Unsupported file type', 400);
+        $filename = bin2hex(random_bytes(16)) . '.' . $extension;
         $uploadPath = $uploadDir . '/' . $filename;
 
         if (!move_uploaded_file($file['tmp_name'], $uploadPath)) {

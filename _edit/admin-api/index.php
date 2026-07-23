@@ -85,6 +85,11 @@ if (!$userId) {
 // AUTHENTICATED ROUTES
 // ============================================
 
+$currentUser = $auth->getCurrentUser();
+if (!\Edit\Core\Auth\Permissions::allows($currentUser['role'] ?? '', $method, $path, $registry->getTypes())) {
+    sendError('Administrator access required', 403);
+}
+
 // Get current user info
 if ($path === '/auth/me' && $method === 'GET') {
     $user = $auth->getCurrentUser();

@@ -114,7 +114,8 @@ function checkRateLimit(Database $db, string $endpoint, int $maxAttempts = 10, i
         // Calculate lockout duration with exponential backoff
         // 1st violation: 1 minute, 2nd: 5 minutes, 3rd+: 15 minutes
         $violations = floor($currentAttempts / $maxAttempts);
-        $lockoutMinutes = min(15, pow(5, min($violations, 2)));
+        $backoffSchedule = [1, 5, 15]; // Minutes for 1st, 2nd, 3rd+ violations
+        $lockoutMinutes = $backoffSchedule[min($violations - 1, 2)] ?? 15;
         $lockedUntil = dateTime("+{$lockoutMinutes} minutes");
 
         $db->table('rate_limits')

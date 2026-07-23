@@ -1,4 +1,11 @@
-# _edit/.htaccess - Root directory
-
-# Serve files and directories directly
-# No rewrites needed - everything has its own folder
+# Apache 2.4; AllowOverride All and mod_rewrite are required.
+Options -Indexes -MultiViews
+RewriteEngine On
+RewriteRule (^|/)\. - [F,L]
+RewriteRule ^(?:data|core|admin-source)(?:/|$) - [F,L,NC]
+RewriteRule ^(?:config\.php|nginx\.conf)(?:/|$) - [F,L,NC]
+RewriteRule ^$ /_edit/admin/ [R=302,L]
+RewriteRule !^(?:admin|admin-api|api|uploads)(?:/|$) - [F,L]
+<FilesMatch "^(config\.php)$">
+    Require all denied
+</FilesMatch>
