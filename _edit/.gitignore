@@ -15,6 +15,7 @@ data/database/*.sqlite-shm
 # User uploads - never commit
 uploads/*
 !uploads/.gitkeep
+!uploads/.htaccess
 
 # Config backups - auto-generated
 data/config/backups/

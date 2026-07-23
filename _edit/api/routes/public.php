@@ -36,13 +36,14 @@ function handlePublicRoutes(string $method, string $path, Database $db, ContentT
         $type = $matches[1];
         $slug = $matches[3] ?? null;
 
-        if (!$registry->exists($type)) {
+        if (!$registry->exists($type) || ($registry->get($type)['public'] ?? true) !== true) {
             sendError("Content type '{$type}' not found", 404);
         }
 
-        $contentType = new ContentType($db, $type, $registry->get($type), $blocks);
+        $contentType = new ContentType($db, $type, $registry->get($type), $blocks, false);
 
         try {
+            parsePublicQueryParams($_GET, $registry->get($type));
             if ($slug) {
                 $item = getPublicContentBySlug($contentType, $registry, $slug);
                 if (!$item) {
@@ -53,8 +54,9 @@ function handlePublicRoutes(string $method, string $path, Database $db, ContentT
                 $result = getPublicContentList($contentType, $registry, $type);
                 sendJson($result);
             }
-        } catch (\Exception $e) {
-            sendError($e->getMessage(), 500);
+        } catch (\Throwable $e) {
+            error_log('Public content request failed: ' . $e->getMessage());
+            sendError('Unable to load content', 500);
         }
         return true;
     }
@@ -75,11 +77,9 @@ function getPublicContentBySlug(ContentType $contentType, ContentTypeRegistry $r
 
     $item = $items[0];
 
+    $item = serializePublicItem($item, $contentType, $registry);
     $item = applyFieldSelection($item, $registry, $_GET);
 
-    $item = populateRelationships($item, $contentType, $registry, $_GET['populate'] ?? '');
-
-    unset($item['author_id']);
 
     return $item;
 }
@@ -114,11 +114,8 @@ function getPublicContentList(ContentType $contentType, ContentTypeRegistry $reg
     $items = $contentType->all($filters);
 
     foreach ($items as &$item) {
+        $item = serializePublicItem($item, $contentType, $registry);
         $item = applyFieldSelection($item, $registry, $_GET);
-
-        $item = populateRelationships($item, $contentType, $registry, $params['populate']);
-
-        unset($item['author_id']);
     }
 
     return [
@@ -138,84 +135,12 @@ function getPublicContentList(ContentType $contentType, ContentTypeRegistry $reg
  */
 function parsePublicQueryParams(array $query, array $contentTypeConfig): array
 {
-    $params = [
-        'limit' => 10,
-        'offset' => 0,
-        'order_by' => 'created_at',
-        'order_dir' => 'DESC',
-        'populate' => '',
-        'field_filters' => []
-    ];
-
-    // Build list of valid field keys from schema
-    $validFieldKeys = [];
-    foreach ($contentTypeConfig['field_groups'] as $group) {
-        foreach ($group['fields'] as $field) {
-            $validFieldKeys[] = $field['key'];
-        }
+    try {
+        return \Edit\Core\ContentTypes\ContentQuery::parse($query, $contentTypeConfig);
+    } catch (\InvalidArgumentException $e) {
+        sendError($e->getMessage(), 400);
     }
 
-    if (isset($query['limit'])) {
-        $limit = (int) $query['limit'];
-        if ($limit < 1 || $limit > 100) {
-            sendError('Invalid parameter \'limit\': must be between 1 and 100', 400);
-        }
-        $params['limit'] = $limit;
-    }
-
-    if (isset($query['offset'])) {
-        $offset = (int) $query['offset'];
-        if ($offset < 0) {
-            sendError('Invalid parameter \'offset\': must be >= 0', 400);
-        }
-        $params['offset'] = $offset;
-    }
-
-    if (isset($query['order_by'])) {
-        $params['order_by'] = $query['order_by'];
-    }
-
-    if (isset($query['order_dir'])) {
-        $orderDir = strtoupper($query['order_dir']);
-        if (!in_array($orderDir, ['ASC', 'DESC'])) {
-            sendError('Invalid parameter \'order_dir\': must be ASC or DESC', 400);
-        }
-        $params['order_dir'] = $orderDir;
-    }
-
-    if (isset($query['populate'])) {
-        $params['populate'] = $query['populate'];
-    }
-
-    foreach ($query as $key => $value) {
-        if (preg_match('/^fields\[([^\]]+)\]$/', $key, $matches)) {
-            $fieldKey = $matches[1];
-
-            $operator = '=';
-            if (preg_match('/^(.+)_(gte|lte|like|not)$/', $fieldKey, $opMatches)) {
-                $fieldKey = $opMatches[1];
-                $operator = match($opMatches[2]) {
-                    'gte' => '>=',
-                    'lte' => '<=',
-                    'like' => 'LIKE',
-                    'not' => '!=',
-                };
-            }
-
-            // Validate field key exists in schema (prevent SQL injection)
-            if (!in_array($fieldKey, $validFieldKeys)) {
-                sendError("Invalid field filter: '{$fieldKey}' is not a valid field for this content type", 400);
-            }
-
-            $params['field_filters'][] = [
-                'key' => $fieldKey,
-                'operator' => $operator,
-                'value' => $value
-            ];
-        }
-    }
-
-    return $params;
 }
 
 /**
@@ -267,7 +192,7 @@ function applyFieldSelection(array $item, ContentTypeRegistry $registry, array $
 
             if (is_array($fieldGroup)) {
                 // Filter fields within this group
-                $fieldGroup = array_filter($fieldGroup, function($fieldKey) use ($requestedFields) {
+                $fieldGroup = array_filter($fieldGroup, function ($fieldKey) use ($requestedFields) {
                     return in_array($fieldKey, $requestedFields);
                 }, ARRAY_FILTER_USE_KEY);
 
@@ -283,201 +208,14 @@ function applyFieldSelection(array $item, ContentTypeRegistry $registry, array $
     return $item;
 }
 
-/**
- * Populate relationship fields
- * Works with grouped field structure
- */
-function populateRelationships(array $item, ContentType $contentType, ContentTypeRegistry $registry, string $populateParam): array
+/** Both public entry points use the same schema-directed serializer. */
+function serializePublicItem(array $item, ContentType $contentType, ContentTypeRegistry $registry): array
 {
-    if (empty($populateParam)) {
-        return $item;
+    global $blocks;
+    $serializer = new \Edit\Core\ContentTypes\PublicSerializer($contentType->getDatabase(), $registry, $blocks);
+    $populate = $_GET['populate'] ?? '';
+    if (!is_string($populate)) {
+        sendError('Invalid populate parameter', 400);
     }
-
-    $fieldsToPopulate = array_map('trim', explode(',', $populateParam));
-    $db = $contentType->getDatabase();
-
-    // Populate fields within field groups
-    foreach ($item['fields'] as $fieldGroupKey => &$fieldGroup) {
-        if ($fieldGroupKey === 'flexible_content') {
-            // Handle flexible_content separately
-            if (is_array($fieldGroup)) {
-                foreach ($fieldGroup as &$block) {
-                    if (isset($block['fields']) && is_array($block['fields'])) {
-                        $block['fields'] = populateNestedRelationships($block['fields'], $fieldsToPopulate, $db, $registry);
-                    }
-                }
-            }
-            continue;
-        }
-
-        if (!is_array($fieldGroup)) {
-            continue;
-        }
-
-        // Populate fields within this field group
-        foreach ($fieldsToPopulate as $fieldKey) {
-            if (!isset($fieldGroup[$fieldKey])) {
-                continue;
-            }
-
-            $value = $fieldGroup[$fieldKey];
-
-            // Handle both single relationships and arrays
-            if (is_array($value) && !empty($value)) {
-                // Check if it's an array of IDs (multiple relationships)
-                if (is_numeric($value[0] ?? null)) {
-                    $populated = [];
-                    foreach ($value as $relatedId) {
-                        if (is_numeric($relatedId)) {
-                            $related = fetchRelatedContent($db, $registry, (int) $relatedId);
-                            if ($related) {
-                                $populated[] = $related;
-                            }
-                        }
-                    }
-                    $fieldGroup[$fieldKey] = $populated;
-                }
-            } elseif (is_numeric($value)) {
-                // Single relationship
-                $related = fetchRelatedContent($db, $registry, (int) $value);
-                if ($related) {
-                    $fieldGroup[$fieldKey] = $related;
-                }
-            }
-        }
-    }
-
-    return $item;
-}
-
-/**
- * Recursively populate relationship fields in nested structures (blocks, repeaters)
- * Also auto-populates media fields
- */
-function populateNestedRelationships(array $fields, array $fieldsToPopulate, Database $db, ContentTypeRegistry $registry): array
-{
-    foreach ($fields as $key => $value) {
-        // Check if this is a basic relationship object that needs full population
-        if (is_array($value) && isset($value['id']) && isset($value['type']) && isset($value['slug']) && !isset($value['fields'])) {
-            // This is a basic relationship object from ContentType - expand it if in populate list
-            if (in_array($key, $fieldsToPopulate)) {
-                $related = fetchRelatedContent($db, $registry, (int) $value['id']);
-                if ($related) {
-                    $fields[$key] = $related;
-                    continue;
-                }
-            }
-        }
-        // Auto-populate media fields (numeric IDs)
-        elseif (is_numeric($value)) {
-            // Try to fetch as media first
-            $media = $db->table('media')->where('id', (int)$value)->first();
-            if ($media) {
-                $fields[$key] = addMediaUrl($media);
-                continue;
-            }
-
-            // If not media and field is in populate list, fetch as content
-            if (in_array($key, $fieldsToPopulate)) {
-                $related = fetchRelatedContent($db, $registry, (int) $value);
-                if ($related) {
-                    $fields[$key] = $related;
-                }
-            }
-        }
-        // Auto-populate arrays of media IDs
-        elseif (is_array($value) && !empty($value)) {
-            // Check if it's a numeric array (list of items)
-            $isNumericArray = array_keys($value) === range(0, count($value) - 1);
-
-            if ($isNumericArray) {
-                // Check if first item is numeric (might be array of media IDs)
-                if (is_numeric($value[0] ?? null)) {
-                    // Try to populate as media IDs
-                    $mediaItems = [];
-                    foreach ($value as $id) {
-                        if (is_numeric($id)) {
-                            $media = $db->table('media')->where('id', (int)$id)->first();
-                            if ($media) {
-                                $mediaItems[] = addMediaUrl($media);
-                            }
-                        }
-                    }
-
-                    // If we found media, use it
-                    if (!empty($mediaItems)) {
-                        $fields[$key] = $mediaItems;
-                        continue;
-                    }
-
-                    // Otherwise try as relationships if in populate list
-                    if (in_array($key, $fieldsToPopulate)) {
-                        $populated = [];
-                        foreach ($value as $relatedId) {
-                            if (is_numeric($relatedId)) {
-                                $related = fetchRelatedContent($db, $registry, (int) $relatedId);
-                                if ($related) {
-                                    $populated[] = $related;
-                                }
-                            }
-                        }
-                        if (!empty($populated)) {
-                            $fields[$key] = $populated;
-                        }
-                    }
-                } else {
-                    // It's a repeater - recursively process each item
-                    foreach ($value as $index => $item) {
-                        if (is_array($item)) {
-                            $fields[$key][$index] = populateNestedRelationships($item, $fieldsToPopulate, $db, $registry);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    return $fields;
-}
-
-/**
- * Fetch related content by ID (published only)
- */
-function fetchRelatedContent(Database $db, ContentTypeRegistry $registry, int $id): ?array
-{
-    // Get content from database
-    $content = $db->table('content')
-        ->where('id', $id)
-        ->where('status', 'published')
-        ->first();
-
-    if (!$content) {
-        return null;
-    }
-
-    $type = $content['type'];
-
-    if (!$registry->exists($type)) {
-        return null;
-    }
-
-    $contentType = new ContentType($db, $type, $registry->get($type));
-    $item = $contentType->find($id);
-
-    if (!$item || $item['status'] !== 'published') {
-        return null;
-    }
-
-    // Parse flexible_content if it's a JSON string
-    if (isset($item['fields']['flexible_content']) && is_string($item['fields']['flexible_content'])) {
-        $decoded = json_decode($item['fields']['flexible_content'], true);
-        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-            $item['fields']['flexible_content'] = $decoded;
-        }
-    }
-
-    // Remove author_id from related content too
-    unset($item['author_id']);
-
-    return $item;
+    return $serializer->serialize($item, array_map('trim', explode(',', $populate))) ?? [];
 }

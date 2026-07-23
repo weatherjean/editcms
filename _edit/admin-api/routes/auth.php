@@ -21,7 +21,7 @@ function handleAuthRoutes(string $method, string $path, Auth $auth, Database $db
         // Rate limit: 5 attempts per 15 minutes
         checkRateLimit($db, 'login', 5, 15);
 
-        $data = getJsonBody();
+        $data = getAuthJsonBody();
         requireFields($data, ['email', 'password']);
 
         $result = $auth->login($data['email'], $data['password']);
@@ -45,14 +45,16 @@ function handleAuthRoutes(string $method, string $path, Auth $auth, Database $db
             sendError('Registration is disabled. Please contact an administrator.', 403);
         }
 
-        $data = getJsonBody();
+        $data = getAuthJsonBody();
         requireFields($data, ['email', 'password', 'name']);
 
         try {
-            $userId = $auth->register($data['email'], $data['password'], $data['name']);
+            (new \Edit\Core\Auth\Installation($db))->claim($data['setup_code'] ?? '', $data['email'], $data['password'], $data['name']);
 
             $result = $auth->login($data['email'], $data['password']);
             sendJson($result);
+        } catch (\DomainException $e) {
+            sendError($e->getMessage(), 403);
         } catch (\Exception $e) {
             sendError($e->getMessage(), 400);
         }
@@ -72,4 +74,26 @@ function handleAuthRoutes(string $method, string $path, Auth $auth, Database $db
     }
 
     return false;
+}
+
+function getAuthJsonBody(): array
+{
+    $raw = file_get_contents('php://input', false, null, 0, 8193);
+    if (strlen($raw) > 8192) {
+        sendError('Authentication request is too large', 413);
+    }
+    try {
+        $data = json_decode($raw, true, 16, JSON_THROW_ON_ERROR);
+    } catch (\JsonException $e) {
+        sendError('Invalid JSON data', 400);
+    }
+    if (!is_array($data) || array_is_list($data)) {
+        sendError('Authentication request must be an object', 400);
+    }
+    foreach (['email', 'password', 'name', 'setup_code'] as $key) {
+        if (array_key_exists($key, $data) && !is_string($data[$key])) {
+            sendError("{$key} must be a string", 400);
+        }
+    }
+    return $data;
 }

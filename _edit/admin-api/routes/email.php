@@ -4,146 +4,118 @@ declare(strict_types=1);
 
 use Edit\Core\Database\Database;
 use Edit\Core\Email\Email;
+use Edit\Core\Security\Captcha;
 use Edit\Core\Security\Security;
 
-/**
- * Public email routes (no auth required)
- *
- * Routes:
- * - GET /send-email/token - Generate single-use email token
- * - POST /send-email - Send email with valid token
- */
+/** Public contact-form endpoints, shared by both API entry points. */
 function handlePublicEmailRoutes(string $method, string $path, Database $db): bool
 {
-    if ($path === '/send-email/token' && $method === 'GET') {
-        // Rate limit: 10 tokens per hour
-        checkRateLimit($db, 'email-token', 10, 60);
-
-        $db->cleanupExpiredEmailTokens();
-
-        $token = Security::generateToken();
-        $expiresAt = dateTime('+30 seconds');
-
-        $db->table('email_tokens')->insert([
-            'token' => $token,
-            'expires_at' => $expiresAt
-        ]);
-
-        sendJson([
-            'token' => $token,
-            'expires_at' => $expiresAt,
-            'expires_in' => 30
-        ]);
-        return true;
+    if ($path === '/captcha') {
+        requireMethod($method, 'GET');
+        header('Cache-Control: no-store');
+        checkRateLimit($db, 'captcha', 10, 1);
+        sendJson((new Captcha($db, EDIT_ENCRYPTION_KEY))->issue());
     }
 
-    if ($path === '/send-email' && $method === 'POST') {
+    if ($path === '/send-email/token') {
+        header('Cache-Control: no-store');
+        sendError('Email tokens have been retired. Submit an ALTCHA proof with your message.', 410);
+    }
+
+    if ($path === '/send-email') {
+        requireMethod($method, 'POST');
+        header('Cache-Control: no-store');
         checkRateLimit($db, 'email-send', 20, 60);
-
-        $db->cleanupExpiredEmailTokens();
-
-        $data = getJsonBody();
-
-        requireFields($data, ['to', 'subject', 'message']);
-
-        requireFields($data, ['token']);
-
-        if (!Security::validateEmail($data['to'])) {
-            sendError('Invalid email address', 400);
+        $data = getEmailRequestData();
+        $settings = getSettings($db, ['contact_recipient', 'email_from_address']);
+        $recipient = $settings['contact_recipient'] ?? $settings['email_from_address'] ?? '';
+        if (!Security::validateEmail($recipient)) {
+            sendError('Contact form is not configured.', 503);
         }
-
-        $tokenCheck = $db->table('email_tokens')
-            ->select(['expires_at'])
-            ->where('token', $data['token'])
-            ->first();
-
-        if (empty($tokenCheck)) {
-            sendError('Invalid or already used email token', 403);
+        // Accept an old client's matching address during migration, never a new destination.
+        if (isset($data['to']) && (!is_string($data['to']) || strcasecmp($data['to'], $recipient) !== 0)) {
+            sendError('The contact recipient is configured by the site administrator.', 400);
         }
-
-        if (strtotime($tokenCheck['expires_at']) < time()) {
-            sendError('Email token expired', 403);
+        if (Captcha::isEnabled($db)
+            && !(new Captcha($db, EDIT_ENCRYPTION_KEY))->verifyAndConsume($data['altcha'] ?? null)) {
+            sendError('Verification failed or expired. Please verify again.', 403);
         }
-
-        $db->table('email_tokens')
-            ->where('token', $data['token'])
-            ->delete();
-
-        $settings = getSettings($db, [
-            'email_from_address',
-            'email_from_name',
-            'smtp_host',
-            'smtp_port',
-            'smtp_username',
-            'smtp_password',
-            'smtp_encryption'
-        ]);
-
-        $smtpConfig = null;
-        if (!empty($settings['smtp_host'] ?? '')) {
-            $decryptedPassword = '';
-            if (!empty($settings['smtp_password'])) {
-                $decryptedPassword = Security::decrypt($settings['smtp_password']) ?? '';
-            }
-
-            $smtpConfig = [
-                'host' => $settings['smtp_host'] ?? '',
-                'port' => $settings['smtp_port'] ?? 587,
-                'username' => $settings['smtp_username'] ?? '',
-                'password' => $decryptedPassword,
-                'encryption' => $settings['smtp_encryption'] ?? 'tls'
-            ];
-        }
-
-        $emailConfig = [
-            'from_email' => $settings['email_from_address'] ?? '',
-            'from_name' => $settings['email_from_name'] ?? ''
-        ];
-
-        $email = new Email($emailConfig['from_email'], $emailConfig['from_name'], $smtpConfig);
-
-        $isHtml = $data['is_html'] ?? false;
-        $message = $data['message'];
-
-        if ($isHtml) {
-            $message = Security::sanitizeHTML($message);
-        }
-
-        $success = $email->send($data['to'], $data['subject'], $message, $isHtml);
-
-        $ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
-
-        if ($success) {
-            $db->table('email_logs')->insert([
-                'to_address' => $data['to'],
-                'subject' => $data['subject'],
-                'message' => $data['message'],
-                'from_name' => $data['from_name'] ?? null,
-                'reply_to' => $data['reply_to'] ?? null,
-                'is_html' => $isHtml ? 1 : 0,
-                'success' => 1,
-                'ip_address' => $ipAddress
-            ]);
-            sendJson(['success' => true, 'message' => 'Email sent successfully']);
-        } else {
-            $errorMessage = $email->getLastError() ?: 'Unknown error';
-            $db->table('email_logs')->insert([
-                'to_address' => $data['to'],
-                'subject' => $data['subject'],
-                'message' => $data['message'],
-                'from_name' => $data['from_name'] ?? null,
-                'reply_to' => $data['reply_to'] ?? null,
-                'is_html' => $isHtml ? 1 : 0,
-                'success' => 0,
-                'error_message' => $errorMessage,
-                'ip_address' => $ipAddress
-            ]);
-            sendError('Failed to send email: ' . $errorMessage, 500);
-        }
-        return true;
+        deliverEmail($db, $data, $recipient);
     }
 
     return false;
+}
+
+/** Validate bounded JSON before consuming a proof or contacting SMTP. */
+function getEmailRequestData(): array
+{
+    $raw = file_get_contents('php://input', false, null, 0, 32769);
+    if ($raw === false || strlen($raw) > 32768) {
+        sendError('Message request is too large.', 413);
+    }
+    try {
+        $data = json_decode($raw, true, 16, JSON_THROW_ON_ERROR);
+    } catch (\JsonException $e) {
+        sendError('Invalid JSON request.', 400);
+    }
+    if (!is_array($data) || array_is_list($data)) {
+        sendError('Expected a JSON object.', 400);
+    }
+    foreach (['subject' => 200, 'message' => 20000] as $field => $limit) {
+        if (!isset($data[$field]) || !is_string($data[$field])
+            || trim($data[$field]) === '' || strlen($data[$field]) > $limit) {
+            sendError("Invalid {$field}.", 400);
+        }
+    }
+    foreach (['subject', 'from_name', 'reply_to'] as $field) {
+        if (isset($data[$field]) && (!is_string($data[$field])
+            || strlen($data[$field]) > 254 || preg_match('/[\r\n\x00]/', $data[$field]))) {
+            sendError("Invalid {$field}.", 400);
+        }
+    }
+    if (!empty($data['reply_to']) && !Security::validateEmail($data['reply_to'])) {
+        sendError('Invalid reply_to address.', 400);
+    }
+    if (isset($data['is_html']) && !is_bool($data['is_html'])) {
+        sendError('is_html must be a boolean.', 400);
+    }
+    return $data;
+}
+
+/** Shared transport for verified public messages and authenticated test messages. */
+function deliverEmail(Database $db, array $data, string $recipient): void
+{
+    $settings = getSettings($db, [
+        'email_from_address', 'email_from_name', 'smtp_host', 'smtp_port',
+        'smtp_username', 'smtp_password', 'smtp_encryption',
+    ]);
+    $smtpConfig = [
+        'host' => $settings['smtp_host'] ?? '',
+        'port' => $settings['smtp_port'] ?? 587,
+        'username' => $settings['smtp_username'] ?? '',
+        'password' => empty($settings['smtp_password']) ? '' : (Security::decrypt($settings['smtp_password']) ?? ''),
+        'encryption' => $settings['smtp_encryption'] ?? 'tls',
+    ];
+    $email = new Email($settings['email_from_address'] ?? '', $settings['email_from_name'] ?? '', $smtpConfig);
+    $isHtml = $data['is_html'] ?? false;
+    $message = $isHtml ? Security::sanitizeHTML($data['message']) : $data['message'];
+    $success = $email->send($recipient, $data['subject'], $message, $isHtml, $data['reply_to'] ?? '');
+    $db->table('email_logs')->insert([
+        'to_address' => $recipient,
+        'subject' => $data['subject'],
+        'message' => $message,
+        'from_name' => $data['from_name'] ?? null,
+        'reply_to' => $data['reply_to'] ?? null,
+        'is_html' => $isHtml ? 1 : 0,
+        'success' => $success ? 1 : 0,
+        // Do not persist SMTP diagnostics that could contain credentials or message content.
+        'error_message' => $success ? null : 'Email delivery failed. Check the SMTP configuration.',
+        'ip_address' => $_SERVER['REMOTE_ADDR'] ?? null,
+    ]);
+    if (!$success) {
+        sendError('Email delivery failed. Please try again later.', 502);
+    }
+    sendJson(['success' => true, 'message' => 'Email sent successfully']);
 }
 
 /**
@@ -156,6 +128,16 @@ function handlePublicEmailRoutes(string $method, string $path, Database $db): bo
  */
 function handleEmailAdminRoutes(string $method, string $path, Database $db): bool
 {
+    if ($path === '/email-test') {
+        requireMethod($method, 'POST');
+        checkRateLimit($db, 'email-test', 10, 60);
+        $data = getEmailRequestData();
+        if (!isset($data['to']) || !is_string($data['to']) || !Security::validateEmail($data['to'])) {
+            sendError('Invalid test recipient.', 400);
+        }
+        deliverEmail($db, $data, $data['to']);
+    }
+
     if ($path === '/email-settings' && $method === 'GET') {
         $settings = getSettings($db, [
             'email_from_address',
@@ -164,7 +146,9 @@ function handleEmailAdminRoutes(string $method, string $path, Database $db): boo
             'smtp_port',
             'smtp_username',
             'smtp_password',
-            'smtp_encryption'
+            'smtp_encryption',
+            'contact_recipient',
+            'captcha_enabled'
         ]);
 
         $maskedPassword = !empty($settings['smtp_password']) ? '********' : '';
@@ -176,7 +160,9 @@ function handleEmailAdminRoutes(string $method, string $path, Database $db): boo
             'smtp_port' => $settings['smtp_port'] ?? '587',
             'smtp_username' => $settings['smtp_username'] ?? '',
             'smtp_password' => $maskedPassword,
-            'smtp_encryption' => $settings['smtp_encryption'] ?? 'tls'
+            'smtp_encryption' => $settings['smtp_encryption'] ?? 'tls',
+            'contact_recipient' => $settings['contact_recipient'] ?? $settings['email_from_address'] ?? '',
+            'captcha_enabled' => Captcha::isEnabled($db)
         ]);
         return true;
     }
@@ -190,12 +176,21 @@ function handleEmailAdminRoutes(string $method, string $path, Database $db): boo
             sendError('Invalid from_email address', 400);
         }
 
+        $recipient = $data['contact_recipient'] ?? $data['from_email'];
+        if (!is_string($recipient) || !Security::validateEmail($recipient)) {
+            sendError('Invalid contact recipient.', 400);
+        }
+        if (!is_string($data['from_name']) || preg_match('/[\r\n\x00]/', $data['from_name'])) {
+            sendError('Invalid from_name.', 400);
+        }
+
         if (!is_numeric($data['smtp_port']) || $data['smtp_port'] < 1 || $data['smtp_port'] > 65535) {
             sendError('Invalid smtp_port', 400);
         }
 
         saveSetting($db, 'email_from_address', $data['from_email']);
         saveSetting($db, 'email_from_name', $data['from_name']);
+        saveSetting($db, 'contact_recipient', $recipient);
 
         saveSetting($db, 'smtp_host', $data['smtp_host']);
         saveSetting($db, 'smtp_port', $data['smtp_port']);
@@ -213,6 +208,9 @@ function handleEmailAdminRoutes(string $method, string $path, Database $db): boo
         }
 
         saveSetting($db, 'smtp_encryption', $data['smtp_encryption'] ?? 'tls');
+
+        // Save captcha setting
+        saveSetting($db, 'captcha_enabled', ($data['captcha_enabled'] ?? Captcha::isEnabled($db)) ? '1' : '0');
 
         sendJson([
             'success' => true,
