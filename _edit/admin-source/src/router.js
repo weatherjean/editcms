@@ -6,6 +6,7 @@ import MediaView from './views/MediaView.vue'
 import UsersView from './views/UsersView.vue'
 import EmailView from './views/EmailView.vue'
 import HealthView from './views/HealthView.vue'
+import { useAuth } from './composables/useAuth'
 import DocumentationView from './views/DocumentationView.vue'
 
 const routes = [
@@ -66,6 +67,11 @@ const routes = [
 const router = createRouter({
   history: createWebHashHistory('/_edit/admin/'),
   routes
+})
+
+router.beforeEach((to) => {
+  const { user } = useAuth()
+  if (user.value?.role === 'editor' && ['config','users','email'].includes(to.name)) return '/media'
 })
 
 export default router

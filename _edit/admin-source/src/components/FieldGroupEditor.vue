@@ -125,6 +125,7 @@ const isEditing = computed(() => !!originalKey.value)
 function open(fieldGroup = null) {
   if (fieldGroup) {
     form.value = {
+      public: fieldGroup.public ?? true,
       key: fieldGroup.key,
       title: fieldGroup.title,
       description: fieldGroup.description || '',

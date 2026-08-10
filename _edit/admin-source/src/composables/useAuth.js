@@ -50,12 +50,13 @@ export function useAuth() {
     handleAuthSuccess(response)
   }
 
-  async function register(name, email, password) {
-    const response = await apiRequest('POST', '/auth/register', { name, email, password })
+  async function register(name, email, password, setup_code) {
+    const response = await apiRequest('POST', '/auth/register', { name, email, password, setup_code })
     handleAuthSuccess(response)
   }
 
   function handleAuthSuccess(response) {
+    isFirstTimeSetup.value = false
     token.value = response.token  // localStorage sync happens via watch
     user.value = response.user
   }

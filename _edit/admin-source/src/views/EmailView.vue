@@ -106,6 +106,23 @@
             <p class="opacity-60 mt-1">SMTP authentication password</p>
           </fieldset>
 
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Contact Form Recipient</legend>
+            <input type="email" v-model="emailConfig.contact_recipient" required class="input w-full" placeholder="inquiries@example.com" />
+            <p class="opacity-60 mt-1">Public contact forms send only to this address.</p>
+          </fieldset>
+
+          <div class="divider">Spam Protection</div>
+
+          <p class="opacity-60 -mt-2 mb-4">
+            ALTCHA protects contact forms using a challenge verified on your server. No external account is needed.
+          </p>
+
+          <label class="label cursor-pointer justify-start gap-4 mb-4">
+            <input type="checkbox" v-model="emailConfig.captcha_enabled" class="toggle">
+            <span class="label-text">Require ALTCHA verification for public forms</span>
+          </label>
+
           <div class="flex gap-2">
             <button type="submit" class="btn btn-primary" :disabled="saving">
               <span v-if="saving" class="loading loading-spinner loading-sm"></span>
@@ -349,7 +366,9 @@ const emailConfig = ref({
   smtp_port: '587',
   smtp_username: '',
   smtp_password: '',
-  smtp_encryption: 'tls'
+  smtp_encryption: 'tls',
+  contact_recipient: '',
+  captcha_enabled: true
 })
 
 const testEmailData = ref({
@@ -408,28 +427,7 @@ async function sendTestEmail() {
   sending.value = true
 
   try {
-    const tokenResponse = await fetch('/_edit/api/send-email/token')
-    if (!tokenResponse.ok) {
-      throw new Error('Failed to get email token')
-    }
-    const tokenData = await tokenResponse.json()
-
-    const response = await fetch('/_edit/api/send-email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        ...testEmailData.value,
-        token: tokenData.token
-      })
-    })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to send test email')
-    }
+    await apiRequest('POST', '/email-test', testEmailData.value)
 
     message.value = 'Test email sent successfully!'
     messageType.value = 'success'

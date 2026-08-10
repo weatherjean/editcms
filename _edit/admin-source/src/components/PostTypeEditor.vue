@@ -243,6 +243,7 @@ function open(module = null) {
   if (module) {
     const postType = module.post_types[0]
     form.value = {
+      public: postType.public ?? true,
       key: postType.key,
       label: postType.label,
       label_plural: postType.label_plural,
@@ -312,6 +313,7 @@ async function save() {
     const module = {
       post_types: [
         {
+          public: form.value.public ?? true,
           key: form.value.key,
           label: form.value.label,
           label_plural: form.value.label_plural,
@@ -322,6 +324,7 @@ async function save() {
         }
       ],
       field_groups: form.value.field_groups.map(fg => ({
+        public: fg.public ?? true,
         key: fg.key,
         title: fg.title,
         description: fg.description,

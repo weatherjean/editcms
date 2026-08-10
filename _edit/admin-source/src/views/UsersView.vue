@@ -13,6 +13,8 @@
       </button>
     </div>
 
+    <div v-if="error && !showCreateModal && !showPasswordModal && !showDeleteModal" class="alert alert-error">{{ error }}</div>
+
     <!-- Users Table -->
     <div class="card bg-base-100 border shadow">
       <div class="card-body">
@@ -30,6 +32,7 @@
               <tr>
                 <th>Name</th>
                 <th>Email</th>
+                <th>Role</th>
                 <th>Created</th>
                 <th class="text-right">Actions</th>
               </tr>
@@ -50,6 +53,12 @@
                   </div>
                 </td>
                 <td>{{ user.email }}</td>
+                <td>
+                  <select :value="user.role" @change="changeRole(user, $event.target.value)" class="select select-sm" :disabled="submitting">
+                    <option value="editor">Editor</option>
+                    <option value="admin">Administrator</option>
+                  </select>
+                </td>
                 <td>{{ formatDate(user.created_at) }}</td>
                 <td class="text-right">
                   <div class="join">
@@ -92,6 +101,13 @@
             <input type="password" v-model="createForm.password" required class="input w-full" />
           </fieldset>
 
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Role</legend>
+            <select v-model="createForm.role" class="select w-full">
+              <option value="editor">Editor — content and media</option>
+              <option value="admin">Administrator — full access</option>
+            </select>
+          </fieldset>
           <div v-if="error" class="alert alert-error">
             <span>{{ error }}</span>
           </div>
@@ -177,7 +193,7 @@ import IconLock from '../components/icons/IconLock.vue'
 import IconTrash from '../components/icons/IconTrash.vue'
 
 const { apiRequest } = useApi()
-const { user: currentUser } = useAuth()
+const { user: currentUser, logout } = useAuth()
 
 const users = ref([])
 const loading = ref(false)
@@ -192,7 +208,8 @@ const selectedUser = ref(null)
 const createForm = ref({
   name: '',
   email: '',
-  password: ''
+  password: '',
+  role: 'editor'
 })
 
 const passwordForm = ref({
@@ -235,6 +252,23 @@ function openPasswordModal(user) {
   showPasswordModal.value = true
 }
 
+async function changeRole(account, role) {
+  error.value = null
+  submitting.value = true
+  try {
+    const result = await apiRequest('PUT', `/users/${account.id}/role`, { role })
+    if (result.reauthenticate) {
+      await logout()
+      window.location.assign('/_edit/admin/')
+    } else await loadUsers()
+  } catch (err) {
+    error.value = err.message
+    await loadUsers()
+  } finally {
+    submitting.value = false
+  }
+}
+
 async function handleChangePassword() {
   error.value = null
 
@@ -243,18 +277,22 @@ async function handleChangePassword() {
     return
   }
 
-  if (passwordForm.value.password.length < 6) {
-    error.value = 'Password must be at least 6 characters'
+  if (passwordForm.value.password.length < 8) {
+    error.value = 'Password must be at least 8 characters'
     return
   }
 
   submitting.value = true
 
   try {
-    await apiRequest('PUT', `/users/${selectedUser.value.id}`, {
+    const result = await apiRequest('PUT', `/users/${selectedUser.value.id}`, {
       password: passwordForm.value.password
     })
     closePasswordModal()
+    if (result.reauthenticate) {
+      await logout()
+      window.location.assign('/_edit/admin/')
+    }
   } catch (err) {
     error.value = err.message || 'Failed to change password'
   } finally {
@@ -285,7 +323,7 @@ async function handleDeleteUser() {
 
 function closeCreateModal() {
   showCreateModal.value = false
-  createForm.value = { name: '', email: '', password: '' }
+  createForm.value = { name: '', email: '', password: '', role: 'editor' }
   error.value = null
 }
 
