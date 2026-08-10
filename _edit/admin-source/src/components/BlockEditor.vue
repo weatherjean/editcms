@@ -123,6 +123,7 @@ const isEditing = computed(() => !!originalKey.value)
 function open(block = null) {
   if (block) {
     form.value = {
+      public: block.public ?? true,
       key: block.key,
       label: block.label,
       description: block.description || '',
