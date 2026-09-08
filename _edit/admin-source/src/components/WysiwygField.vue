@@ -52,6 +52,7 @@ import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import Quill from 'quill'
 import 'quill/dist/quill.snow.css'
 import MediaModal from './MediaModal.vue'
+import { sanitizeEditorHtml } from '../security/html'
 import { useMedia } from '../composables/useMedia'
 import { useToast } from '../composables/useToast'
 
@@ -100,7 +101,7 @@ onMounted(() => {
     })
 
     if (props.modelValue) {
-      quillInstance.root.innerHTML = props.modelValue
+      quillInstance.root.innerHTML = sanitizeEditorHtml(props.modelValue)
       htmlSource.value = props.modelValue
     }
 
@@ -123,7 +124,7 @@ function setMode(htmlMode) {
     htmlSource.value = quillInstance.root.innerHTML
   } else if (!htmlMode && quillInstance) {
     // Switching to visual mode - sync from HTML editor
-    quillInstance.root.innerHTML = htmlSource.value
+    quillInstance.root.innerHTML = sanitizeEditorHtml(htmlSource.value)
   }
   isHtmlMode.value = htmlMode
 }
@@ -169,7 +170,7 @@ async function handleMediaUpload(file) {
 }
 watch(() => props.modelValue, (newValue) => {
   if (quillInstance && !isHtmlMode.value && quillInstance.root.innerHTML !== newValue) {
-    quillInstance.root.innerHTML = newValue || ''
+    quillInstance.root.innerHTML = sanitizeEditorHtml(newValue)
     htmlSource.value = newValue || ''
   }
 })

@@ -7,7 +7,7 @@ help:
 	@echo "  make backend    - Start PHP backend only (port 8000)"
 	@echo "  make frontend   - Start Vue frontend only (port 5173)"
 	@echo "  make install    - Install frontend dependencies"
-	@echo "  make build      - Build frontend for production"
+	@echo "  make build      - Build complete distribution"
 	@echo "  make clean      - Clean build artifacts"
 
 # Start both servers in parallel
@@ -37,17 +37,17 @@ frontend:
 # Install dependencies
 install:
 	@echo "Installing frontend dependencies..."
-	@cd _edit/admin-source && npm install
+	@cd _edit/admin-source && npm ci
 	@echo "Done! Run 'make develop' to start development servers."
 
 # Build for production
 build:
-	@echo "Building frontend for production..."
-	@cd _edit/admin-source && npm run build
-	@echo "Build complete! Files in _edit/admin/dist/"
+	@echo "Building complete distribution..."
+	@bash build.sh
+	@echo "Build complete! Archive in dist/_edit-dev.zip"
 
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
-	@rm -rf _edit/admin/dist
+	@rm -rf _edit/admin
 	@echo "Clean complete!"
