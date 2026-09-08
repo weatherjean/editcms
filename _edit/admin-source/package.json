@@ -3,26 +3,31 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
+    "vendor:altcha": "node scripts/vendor-altcha.mjs",
+    "predev": "npm run vendor:altcha",
+    "prebuild": "npm run vendor:altcha",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@monaco-editor/react": "^4.7.0",
-    "highlight.js": "^11.11.1",
-    "marked": "^17.0.0",
-    "monaco-editor": "^0.54.0",
+    "altcha": "3.2.2",
+    "dompurify": "3.4.15",
+    "highlight.js": "^11.12.0",
+    "marked": "^18.0.12",
     "quill": "^2.0.3",
-    "vite-plugin-monaco-editor": "^1.1.0",
-    "vue": "^3.5.22",
-    "vue-router": "^4.6.3"
+    "vue": "^3.5.42",
+    "vue-router": "^5.3.1"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.1.16",
-    "@vitejs/plugin-vue": "^6.0.1",
-    "daisyui": "^5.3.9",
-    "tailwindcss": "^4.1.16",
-    "vite": "^7.1.7"
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "daisyui": "^5.7.28",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.2.2"
   }
 }

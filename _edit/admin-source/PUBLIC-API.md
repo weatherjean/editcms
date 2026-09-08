@@ -579,178 +579,73 @@ async function fetchWithRetry(url) {
 
 ## Sending Emails
 
-The public email API uses a two-step token-based system to prevent spam while allowing form submissions from your frontend.
+Public forms send mail only to the **Contact Form Recipient** configured in the admin Email settings. CAPTCHA protection uses fully self-hosted ALTCHA. No external account or CDN is required.
 
-### How It Works
+### Migration from the color CAPTCHA
 
-1. **Request a Token** - Generate a single-use token (valid for 30 seconds)
-2. **Send Email** - Use the token to send an email (token consumed on use)
+The old color challenge has been removed. `GET /_edit/api/send-email/token` now returns **410 Gone**. Submit the ALTCHA proof directly with the message; old tokens and `captcha_answer`/`captcha_solution` parameters no longer work. Existing custom forms must adopt this flow before upgrading.
 
-Both endpoints are **rate-limited** to prevent abuse:
-- **10 tokens per hour** per IP address
-- **20 emails per hour** per IP address
+### Add the local widget
 
-### Step 1: Get Token
-
-**Endpoint:** `GET /_edit/api/send-email/token`
-
-```javascript
-const tokenResponse = await fetch('/_edit/api/send-email/token');
-const { token } = await tokenResponse.json();
+```html
+<script type="module" src="/_edit/admin/altcha/altcha.min.js"></script>
+<form id="contact-form">
+  <input name="reply_to" type="email" required placeholder="Your email">
+  <input name="subject" required maxlength="200" placeholder="Subject">
+  <textarea name="message" required maxlength="10000"></textarea>
+  <altcha-widget challenge="/_edit/api/captcha" name="altcha"></altcha-widget>
+  <button type="submit">Send</button>
+</form>
 ```
 
-**Response:**
+Use HTTPS in production. The widget generates a hidden `altcha` field after verification. The challenge is valid for ten minutes and can be accepted only once. A complete working example, including button state and retries, ships at `/_edit/admin/altcha/contact-example.html` with its companion JavaScript file.
 
-```json
-{
-  "token": "abc123def456..."
-}
-```
-
-### Step 2: Send Email
+### Send a verified message
 
 **Endpoint:** `POST /_edit/api/send-email`
 
-**Required Fields:**
-- `token` - The token from step 1
-- `to` - Recipient email address
-- `subject` - Email subject line
-- `message` - Email body (plain text or HTML)
-
-**Optional Fields:**
-- `from_name` - Sender name (overrides default)
-- `reply_to` - Reply-to address
-- `is_html` - Set to `true` for HTML emails (default: `false`)
-
 ```javascript
-const emailResponse = await fetch('/_edit/api/send-email', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    token: token,
-    to: 'recipient@example.com',
-    subject: 'Contact Form Submission',
-    message: 'Hello, this is a message from the contact form...',
-    reply_to: 'user@example.com'
-  })
-});
-
-const result = await emailResponse.json();
-```
-
-**Success Response:**
-
-```json
-{
-  "success": true,
-  "message": "Email sent successfully"
-}
-```
-
-**Error Response:**
-
-```json
-{
-  "error": "Invalid or expired token",
-  "code": 400
-}
-```
-
-### Complete Contact Form Example
-
-```javascript
-async function sendContactForm(formData) {
+const form = document.querySelector('#contact-form');
+const widget = form.querySelector('altcha-widget');
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(form));
+  if (!data.altcha) return; // Server verification is mandatory when enabled.
   try {
-    // Step 1: Get token
-    const tokenResponse = await fetch('/_edit/api/send-email/token');
-
-    if (!tokenResponse.ok) {
-      throw new Error('Failed to get email token');
-    }
-
-    const { token } = await tokenResponse.json();
-
-    // Step 2: Send email (must happen within 30 seconds)
-    const emailResponse = await fetch('/_edit/api/send-email', {
+    const response = await fetch('/_edit/api/send-email', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        token: token,
-        to: 'contact@yoursite.com',
-        subject: `Contact Form: ${formData.subject}`,
-        message: `
-Name: ${formData.name}
-Email: ${formData.email}
-
-Message:
-${formData.message}
-        `,
-        reply_to: formData.email
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
     });
-
-    if (!emailResponse.ok) {
-      const error = await emailResponse.json();
-      throw new Error(error.error || 'Failed to send email');
-    }
-
-    const result = await emailResponse.json();
-    console.log('Email sent successfully!');
-    return result;
-
-  } catch (error) {
-    console.error('Error sending email:', error);
-    throw error;
-  }
-}
-
-// Usage
-const form = document.getElementById('contact-form');
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-
-  const formData = {
-    name: form.name.value,
-    email: form.email.value,
-    subject: form.subject.value,
-    message: form.message.value
-  };
-
-  try {
-    await sendContactForm(formData);
-    alert('Message sent successfully!');
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error);
     form.reset();
+    alert('Message sent.');
   } catch (error) {
-    alert('Failed to send message. Please try again.');
+    alert(error.message || 'Unable to send your message. Please try again.');
+  } finally {
+    widget.reset(); // A failed delivery can still consume the proof.
   }
 });
 ```
 
-### Important Notes
+| Field | Requirement |
+| --- | --- |
+| `subject` | Required nonempty string, at most 200 bytes, no header newlines |
+| `message` | Required nonempty string, at most 20,000 bytes |
+| `altcha` | Required when CAPTCHA is enabled; base64 payload from the widget |
+| `reply_to` | Optional valid email; becomes the outgoing Reply-To header |
+| `from_name` | Optional name recorded in the email log; does not replace the configured sender |
+| `is_html` | Optional boolean, defaults to false; HTML is sanitized before sending |
+| `to` | Omit it. A legacy supplied address must match the server-configured recipient |
 
-**Token Expiration:**
-- Tokens expire after **30 seconds**
-- Request the token immediately before sending the email
-- Don't request tokens in advance or cache them
+The total JSON request is limited to 32 KiB. Successful sends return `{"success":true,"message":"Email sent successfully"}`. Invalid or reused proofs return 403; invalid fields return 400; oversized requests return 413; an unconfigured contact recipient returns 503; delivery failures return a generic 502. Rate limits return 429 (10 challenges/minute and 20 send attempts/hour per IP).
 
-**Rate Limiting:**
-- If you exceed rate limits, you'll receive a `429` status code
-- The `Retry-After` header indicates when you can try again
-- Limits reset every hour
+New installations require CAPTCHA by default. An existing explicit opt-out is preserved; enable it in Email settings when updating a site. The same verification applies through both the public and admin API aliases. Admin SMTP tests use a separate authenticated endpoint and do not require a CAPTCHA.
 
-**SMTP Configuration:**
-- Emails require SMTP settings configured in the admin panel
-- If SMTP is not configured, the system falls back to PHP's `mail()` function
-- Test your email configuration before deploying to production
+### Local hosting and CSP
 
-**Security:**
-- Never expose your admin API credentials to frontend code
-- The token system is designed for public form submissions only
-- All email sends are logged in the admin panel for monitoring
+The shipped widget includes its standard PBKDF2 worker and styles. No external verification request is made. Sites with a restrictive CSP must allow the local script and API, `worker-src 'self' blob:`, and the widget's injected styling. The distribution includes the widget and PHP library MIT license notices.
 
 ---
 
@@ -1037,3 +932,13 @@ For issues, questions, or feature requests, please refer to the _edit CMS docume
 
 **API Version:** 1.0
 **Last Updated:** 2025-11-13
+
+## Public visibility
+
+Both public API aliases enforce the same schema visibility. Only published records and published relationship targets are returned. Set `"public": false` on post types, field groups, fields, or blocks to hide them. Undeclared fields and login-user relationships are omitted. Unknown blocks are omitted; registered blocks and repeaters follow their nested field schemas. Unavailable single relationships are `null`, and unavailable multiple entries are omitted. `populate` expands only schema-defined relationships, up to three levels; other numeric fields retain their values. Media URLs are public; field visibility does not make uploads private.
+
+## Typed filtering and sorting
+
+Use `fields[details.price_gte]=200000&order_by=details.price&order_dir=ASC` for grouped metadata. Bare keys such as `price` work only when unique across groups. PHP bracket-form parameters are supported directly. Numeric fields compare and sort numerically; invalid/missing values sort last. Content ID breaks ordering ties. Filters also apply to pagination totals.
+
+Limits must be integers from 1 to 100; offsets from 0 to 1,000,000. Invalid, ambiguous, private, or non-scalar query fields return 400. Core sortable fields are `id`, `slug`, `created_at`, and `updated_at`; declared scalar metadata fields can also be sorted. Numeric fields do not support `_like`.
