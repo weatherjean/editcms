@@ -16,6 +16,7 @@ _edit/data/database/*.sqlite-wal
 _edit/data/database/*.sqlite-shm
 _edit/uploads/*
 !_edit/uploads/.gitkeep
+!_edit/uploads/.htaccess
 
 # Configuration (contains secrets)
 _edit/config.php
