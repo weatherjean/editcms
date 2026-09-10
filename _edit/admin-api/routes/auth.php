@@ -79,12 +79,21 @@ function handleAuthRoutes(string $method, string $path, Auth $auth, Database $db
 function getAuthJsonBody(): array
 {
     $raw = file_get_contents('php://input', false, null, 0, 8193);
-    if (strlen($raw) > 8192) sendError('Authentication request is too large', 413);
-    try { $data = json_decode($raw, true, 16, JSON_THROW_ON_ERROR); }
-    catch (\JsonException $e) { sendError('Invalid JSON data', 400); }
-    if (!is_array($data) || array_is_list($data)) sendError('Authentication request must be an object', 400);
-    foreach (['email','password','name','setup_code'] as $key) {
-        if (array_key_exists($key,$data) && !is_string($data[$key])) sendError("{$key} must be a string", 400);
+    if (strlen($raw) > 8192) {
+        sendError('Authentication request is too large', 413);
+    }
+    try {
+        $data = json_decode($raw, true, 16, JSON_THROW_ON_ERROR);
+    } catch (\JsonException $e) {
+        sendError('Invalid JSON data', 400);
+    }
+    if (!is_array($data) || array_is_list($data)) {
+        sendError('Authentication request must be an object', 400);
+    }
+    foreach (['email', 'password', 'name', 'setup_code'] as $key) {
+        if (array_key_exists($key, $data) && !is_string($data[$key])) {
+            sendError("{$key} must be a string", 400);
+        }
     }
     return $data;
 }

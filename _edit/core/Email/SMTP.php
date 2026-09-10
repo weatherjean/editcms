@@ -2,7 +2,8 @@
 
 namespace Edit\Core\Email;
 
-class SMTP {
+class SMTP
+{
     private $socket;
     private string $host;
     private int $port;
@@ -12,7 +13,8 @@ class SMTP {
     private int $timeout = 30;
     private string $lastError = '';
 
-    public function __construct(string $host, int $port, string $username, string $password, string $encryption = 'tls') {
+    public function __construct(string $host, int $port, string $username, string $password, string $encryption = 'tls')
+    {
         $this->host = $host;
         $this->port = $port;
         $this->username = $username;
@@ -23,7 +25,8 @@ class SMTP {
     /**
      * Send an email via SMTP
      */
-    public function send(string $from, string $fromName, string $to, string $subject, string $message, bool $isHtml = true, string $replyTo = ''): bool {
+    public function send(string $from, string $fromName, string $to, string $subject, string $message, bool $isHtml = true, string $replyTo = ''): bool
+    {
         try {
             foreach ([$from, $fromName, $to, $subject, $replyTo] as $headerValue) {
                 if (preg_match('/[\r\n\x00]/', $headerValue)) {
@@ -47,14 +50,16 @@ class SMTP {
     /**
      * Get the last error message
      */
-    public function getLastError(): string {
+    public function getLastError(): string
+    {
         return $this->lastError;
     }
 
     /**
      * Connect to SMTP server
      */
-    private function connect(): void {
+    private function connect(): void
+    {
         $context = stream_context_create([
             'ssl' => [
                 'verify_peer' => true,
@@ -107,7 +112,8 @@ class SMTP {
     /**
      * Authenticate with SMTP server
      */
-    private function authenticate(): void {
+    private function authenticate(): void
+    {
         // Use AUTH LOGIN method
         $this->sendCommand("AUTH LOGIN");
         $this->sendCommand(base64_encode($this->username));
@@ -117,7 +123,8 @@ class SMTP {
     /**
      * Send the actual email
      */
-    private function sendMail(string $from, string $fromName, string $to, string $subject, string $message, bool $isHtml, string $replyTo): void {
+    private function sendMail(string $from, string $fromName, string $to, string $subject, string $message, bool $isHtml, string $replyTo): void
+    {
         // MAIL FROM
         $this->sendCommand("MAIL FROM:<{$from}>");
 
@@ -145,7 +152,8 @@ class SMTP {
     /**
      * Build email headers
      */
-    private function buildHeaders(string $from, string $fromName, string $to, string $subject, bool $isHtml, string $replyTo): string {
+    private function buildHeaders(string $from, string $fromName, string $to, string $subject, bool $isHtml, string $replyTo): string
+    {
         $headers = [];
 
         // From header
@@ -186,7 +194,8 @@ class SMTP {
     /**
      * Disconnect from SMTP server
      */
-    private function disconnect(): void {
+    private function disconnect(): void
+    {
         $this->sendCommand("QUIT");
         if ($this->socket) {
             fclose($this->socket);
@@ -197,7 +206,8 @@ class SMTP {
     /**
      * Send a command to SMTP server and get response
      */
-    private function sendCommand(string $command): string {
+    private function sendCommand(string $command): string
+    {
         fwrite($this->socket, $command . "\r\n");
         $response = $this->getResponse();
 
@@ -211,7 +221,8 @@ class SMTP {
     /**
      * Send data (email content)
      */
-    private function sendData(string $data): void {
+    private function sendData(string $data): void
+    {
         fwrite($this->socket, $data . "\r\n");
         $response = $this->getResponse();
 
@@ -223,7 +234,8 @@ class SMTP {
     /**
      * Read response from SMTP server
      */
-    private function getResponse(): string {
+    private function getResponse(): string
+    {
         $response = '';
 
         while ($line = fgets($this->socket, 515)) {
@@ -242,7 +254,8 @@ class SMTP {
     /**
      * Check if SMTP response indicates success
      */
-    private function isSuccessResponse(string $response): bool {
+    private function isSuccessResponse(string $response): bool
+    {
         $code = (int) substr($response, 0, 3);
 
         // Success codes: 2xx and 3xx

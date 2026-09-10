@@ -30,7 +30,9 @@ class ContentType
     {
         foreach (ContentSchema::fields($this->config) as $fieldKey => $fieldConfig) {
             $fieldType = $fieldConfig['type'];
-            if ($fieldType === 'flexible_content') continue;
+            if ($fieldType === 'flexible_content') {
+                continue;
+            }
             $className = 'Edit\\Core\\Fields\\' . ucfirst($fieldType) . 'Field';
 
             if (class_exists($className)) {
@@ -53,7 +55,9 @@ class ContentType
             $authorId = $data['author_id'] ?? null;
 
             $data['fields'] = (new ContentValidator($this->db, $this->blockRegistry))->validate(array_key_exists('fields', $data) ? $data['fields'] : [], $this->config, $status === 'published');
-            if (!in_array($status, ['draft', 'published'], true)) throw new \InvalidArgumentException('Invalid content status');
+            if (!in_array($status, ['draft', 'published'], true)) {
+                throw new \InvalidArgumentException('Invalid content status');
+            }
 
             // Slug is required and must be URL-safe
             if (!is_string($slug) || $slug === '') {
@@ -98,7 +102,7 @@ class ContentType
      */
     public function update(int $id, array $data): bool
     {
-        return $this->transaction(fn() => $this->updateRecord($id, $data));
+        return $this->transaction(fn () => $this->updateRecord($id, $data));
     }
 
     /** Called only inside the transaction owned by update or restore. */
@@ -115,10 +119,14 @@ class ContentType
         }
 
         $status = array_key_exists('status', $data) ? $data['status'] : $currentContent['status'];
-        if (!in_array($status, ['draft', 'published'], true)) throw new \InvalidArgumentException('Invalid content status');
+        if (!in_array($status, ['draft', 'published'], true)) {
+            throw new \InvalidArgumentException('Invalid content status');
+        }
         $fields = array_key_exists('fields', $data) ? $data['fields'] : $this->getMeta($id);
         $validated = (new ContentValidator($this->db, $this->blockRegistry))->validate($fields, $this->config, $status === 'published');
-        if (array_key_exists('fields', $data)) $data['fields'] = $validated;
+        if (array_key_exists('fields', $data)) {
+            $data['fields'] = $validated;
+        }
 
         // Build update data for core fields
         $updateData = [];
@@ -227,7 +235,9 @@ class ContentType
         $result['fields'] = $this->getMeta($id);
 
         // Populate relationships
-        if ($this->resolveReferences) $result = $this->populateRelationships($result);
+        if ($this->resolveReferences) {
+            $result = $this->populateRelationships($result);
+        }
 
         return $result;
     }
@@ -260,14 +270,16 @@ class ContentType
         $orderBy = $filters['order_by'] ?? 'created_at';
         $orderDir = $filters['order_dir'] ?? 'DESC';
         $orderDir = strtoupper($orderDir);
-        if (!in_array($orderDir, ['ASC','DESC'], true)) throw new \InvalidArgumentException('Invalid sort direction');
+        if (!in_array($orderDir, ['ASC', 'DESC'], true)) {
+            throw new \InvalidArgumentException('Invalid sort direction');
+        }
         if (in_array($orderBy, ContentQuery::CORE_SORTS, true)) {
             $query->orderByExpression('content.' . $orderBy . ' ' . $orderDir . ', content.id ASC');
         } else {
             [$path,$field] = ContentQuery::field($this->config, $orderBy, !$this->resolveReferences);
             $value = ContentQuery::expression($field, 'sort_meta.meta_value');
             $expression = "(SELECT {$value} FROM content_meta sort_meta WHERE sort_meta.content_id = content.id AND sort_meta.meta_key = ? LIMIT 1)";
-            $query->orderByExpression("{$expression} IS NULL ASC, {$expression} {$orderDir}, content.id ASC", [$path,$path]);
+            $query->orderByExpression("{$expression} IS NULL ASC, {$expression} {$orderDir}, content.id ASC", [$path, $path]);
         }
 
         // Apply pagination
@@ -290,7 +302,9 @@ class ContentType
             // Populate meta and relationships for each item
             foreach ($results as &$item) {
                 $item['fields'] = $allMeta[(int)$item['id']] ?? [];
-                if ($this->resolveReferences) $item = $this->populateRelationships($item);
+                if ($this->resolveReferences) {
+                    $item = $this->populateRelationships($item);
+                }
             }
         }
 
@@ -528,7 +542,9 @@ class ContentType
             }
         }
 
-        foreach ($result as &$fields) $fields = ContentHtml::clean($fields, $this->config, $this->blockRegistry);
+        foreach ($result as &$fields) {
+            $fields = ContentHtml::clean($fields, $this->config, $this->blockRegistry);
+        }
         return $result;
     }
 
@@ -794,8 +810,10 @@ class ContentType
             $value = ContentQuery::value($filter['value'], $field, $operator);
             $left = ContentQuery::expression($field, 'm.meta_value');
             $right = ContentQuery::expression($field, '?');
-            if ($operator === 'LIKE') $value = '%' . $value . '%';
-            $query->whereExists("SELECT 1 FROM content_meta m WHERE m.content_id = content.id AND m.meta_key = ? AND {$left} {$operator} {$right}", [$path,$value]);
+            if ($operator === 'LIKE') {
+                $value = '%' . $value . '%';
+            }
+            $query->whereExists("SELECT 1 FROM content_meta m WHERE m.content_id = content.id AND m.meta_key = ? AND {$left} {$operator} {$right}", [$path, $value]);
         }
     }
 
@@ -897,7 +915,9 @@ class ContentType
     {
         return $this->transaction(function () use ($contentId, $revisionId): bool {
             $revision = $this->db->table('content_revisions')->where('id', $revisionId)->where('content_id', $contentId)->first();
-            if (!$revision) throw new \InvalidArgumentException('Revision not found');
+            if (!$revision) {
+                throw new \InvalidArgumentException('Revision not found');
+            }
             $fields = json_decode($revision['fields'], true, 64, JSON_THROW_ON_ERROR);
             // Validate against the current schema. Incompatible old snapshots fail
             // atomically and remain available for manual recovery.

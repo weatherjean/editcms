@@ -22,20 +22,30 @@ use Edit\Core\Database\Database;
 use Edit\Core\Security\Captcha;
 
 $checks = 0;
-function check(bool $condition, string $message): void {
+function check(bool $condition, string $message): void
+{
     global $checks;
-    if (!$condition) throw new RuntimeException($message);
+    if (!$condition) {
+        throw new RuntimeException($message);
+    }
     $checks++;
 }
-function solve(array $challenge): array {
+function solve(array $challenge): array
+{
     $challenge = Challenge::fromArray($challenge);
     $solution = (new Altcha())->solveChallenge(new SolveChallengeOptions(
-        algorithm: new Pbkdf2(), challenge: $challenge,
+        algorithm: new Pbkdf2(),
+        challenge: $challenge,
     ));
-    if (!$solution) throw new RuntimeException('Fixture could not solve challenge.');
+    if (!$solution) {
+        throw new RuntimeException('Fixture could not solve challenge.');
+    }
     return (new Payload($challenge, $solution))->toArray();
 }
-function encode(array $payload): string { return base64_encode(json_encode($payload, JSON_THROW_ON_ERROR)); }
+function encode(array $payload): string
+{
+    return base64_encode(json_encode($payload, JSON_THROW_ON_ERROR));
+}
 
 $db = new Database(':memory:');
 $captcha = new Captcha($db, 'fixture-secret-not-an-installation-key');

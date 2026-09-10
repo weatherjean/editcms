@@ -192,7 +192,7 @@ function applyFieldSelection(array $item, ContentTypeRegistry $registry, array $
 
             if (is_array($fieldGroup)) {
                 // Filter fields within this group
-                $fieldGroup = array_filter($fieldGroup, function($fieldKey) use ($requestedFields) {
+                $fieldGroup = array_filter($fieldGroup, function ($fieldKey) use ($requestedFields) {
                     return in_array($fieldKey, $requestedFields);
                 }, ARRAY_FILTER_USE_KEY);
 
@@ -214,6 +214,8 @@ function serializePublicItem(array $item, ContentType $contentType, ContentTypeR
     global $blocks;
     $serializer = new \Edit\Core\ContentTypes\PublicSerializer($contentType->getDatabase(), $registry, $blocks);
     $populate = $_GET['populate'] ?? '';
-    if (!is_string($populate)) sendError('Invalid populate parameter', 400);
+    if (!is_string($populate)) {
+        sendError('Invalid populate parameter', 400);
+    }
     return $serializer->serialize($item, array_map('trim', explode(',', $populate))) ?? [];
 }

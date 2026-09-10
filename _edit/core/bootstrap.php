@@ -17,12 +17,15 @@ require_once __DIR__ . '/Operations/Maintenance.php';
 $configFile = EDIT_BASE_PATH . '/config.php';
 if (!file_exists($configFile)) {
     $configLock = @fopen(EDIT_BASE_PATH . '/data/.config.lock', 'c');
-    if (!$configLock || !flock($configLock, LOCK_EX)) { http_response_code(503); exit('Configuration unavailable'); }
+    if (!$configLock || !flock($configLock, LOCK_EX)) {
+        http_response_code(503);
+        exit('Configuration unavailable');
+    }
     try {
-    if (!file_exists($configFile)) {
-    // Auto-generate secure config.php with random encryption key
-    $encryptionKey = bin2hex(random_bytes(32));
-    $configContent = <<<PHP
+        if (!file_exists($configFile)) {
+            // Auto-generate secure config.php with random encryption key
+            $encryptionKey = bin2hex(random_bytes(32));
+            $configContent = <<<PHP
 <?php
 /**
  * _edit CMS Configuration
@@ -69,13 +72,16 @@ define('EDIT_MAX_ZIP_UNCOMPRESSED_SIZE', 50 * 1024 * 1024); // 50MB
 define('EDIT_MAX_ZIP_FILES', 1000);
 
 PHP;
-    $temporaryConfig = EDIT_BASE_PATH . '/.config-' . bin2hex(random_bytes(8)) . '.tmp';
-    if (file_put_contents($temporaryConfig, $configContent) === false || !chmod($temporaryConfig, 0600) || !rename($temporaryConfig, $configFile)) {
-        @unlink($temporaryConfig);
-        throw new \RuntimeException('Cannot initialize configuration');
+            $temporaryConfig = EDIT_BASE_PATH . '/.config-' . bin2hex(random_bytes(8)) . '.tmp';
+            if (file_put_contents($temporaryConfig, $configContent) === false || !chmod($temporaryConfig, 0600) || !rename($temporaryConfig, $configFile)) {
+                @unlink($temporaryConfig);
+                throw new \RuntimeException('Cannot initialize configuration');
+            }
+        }
+    } finally {
+        flock($configLock, LOCK_UN);
+        fclose($configLock);
     }
-    }
-    } finally { flock($configLock, LOCK_UN); fclose($configLock); }
 }
 
 require_once $configFile;

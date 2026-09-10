@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+
 namespace Edit\Core\Operations;
 
 final class Maintenance
@@ -22,11 +23,14 @@ final class Maintenance
             exit('CMS maintenance in progress. Please retry shortly.');
         }
     }
+
     /** A relocated config must never reconnect a restored site to the old database. */
     public static function checkRestoredDatabase(string $root, string $database): void
     {
         $marker = $root . '/data/.restored-database.json';
-        if (!is_file($marker)) return;
+        if (!is_file($marker)) {
+            return;
+        }
         $expected = json_decode(file_get_contents($marker), true);
         $path = $expected['database'] ?? null;
         if (!is_string($path) || !str_starts_with($path, 'data/') || str_contains($path, '..')
@@ -35,5 +39,4 @@ final class Maintenance
             exit('Restored database configuration needs correction before this installation can run.');
         }
     }
-
 }

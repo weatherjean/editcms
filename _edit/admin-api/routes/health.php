@@ -65,8 +65,12 @@ function handleHealthRoutes(string $method, string $path, Database $db): bool
         $hasErrors = false;
         $hasWarnings = false;
         foreach ($checks as $check) {
-            if ($check['status'] === 'error') $hasErrors = true;
-            if ($check['status'] === 'warning') $hasWarnings = true;
+            if ($check['status'] === 'error') {
+                $hasErrors = true;
+            }
+            if ($check['status'] === 'warning') {
+                $hasWarnings = true;
+            }
         }
 
         $overall = $hasErrors ? 'error' : ($hasWarnings ? 'warning' : 'ok');

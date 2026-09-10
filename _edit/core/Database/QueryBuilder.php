@@ -406,7 +406,7 @@ class QueryBuilder
         $this->bindings = [];
 
         // Build SELECT clause
-        $columns = implode(', ', array_map(function($col) {
+        $columns = implode(', ', array_map(function ($col) {
             return $col === '*' || str_contains($col, '(') ? $col : $this->escapeIdentifier($col);
         }, $this->select));
 
@@ -550,7 +550,7 @@ class QueryBuilder
         // Handle qualified names
         if (str_contains($identifier, '.')) {
             $parts = explode('.', $identifier);
-            return implode('.', array_map(fn($p) => '"' . str_replace('"', '""', $p) . '"', $parts));
+            return implode('.', array_map(fn ($p) => '"' . str_replace('"', '""', $p) . '"', $parts));
         }
 
         return '"' . str_replace('"', '""', $identifier) . '"';

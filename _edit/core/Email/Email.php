@@ -2,13 +2,15 @@
 
 namespace Edit\Core\Email;
 
-class Email {
+class Email
+{
     private string $fromEmail;
     private string $fromName;
     private ?array $smtpConfig;
     private string $lastError = '';
 
-    public function __construct(string $fromEmail = '', string $fromName = '', ?array $smtpConfig = null) {
+    public function __construct(string $fromEmail = '', string $fromName = '', ?array $smtpConfig = null)
+    {
         $this->fromEmail = $fromEmail;
         $this->fromName = $fromName;
         $this->smtpConfig = $smtpConfig;
@@ -23,7 +25,8 @@ class Email {
      * @param bool $isHtml Whether the message is HTML (default: true)
      * @return bool Success status
      */
-    public function send($to, string $subject, string $message, bool $isHtml = true, string $replyTo = ''): bool {
+    public function send($to, string $subject, string $message, bool $isHtml = true, string $replyTo = ''): bool
+    {
         // Check if SMTP is configured
         if (!$this->isSmtpConfigured()) {
             $this->lastError = 'SMTP is not configured. Please configure SMTP settings in the Email page.';
@@ -56,14 +59,16 @@ class Email {
     /**
      * Get the last error message
      */
-    public function getLastError(): string {
+    public function getLastError(): string
+    {
         return $this->lastError;
     }
 
     /**
      * Check if SMTP is properly configured
      */
-    private function isSmtpConfigured(): bool {
+    private function isSmtpConfigured(): bool
+    {
         return !empty($this->smtpConfig['host']) &&
                !empty($this->smtpConfig['port']) &&
                !empty($this->smtpConfig['username']) &&
@@ -73,7 +78,8 @@ class Email {
     /**
      * Set the from email address
      */
-    public function setFrom(string $email, string $name = ''): void {
+    public function setFrom(string $email, string $name = ''): void
+    {
         $this->fromEmail = $email;
         $this->fromName = $name;
     }

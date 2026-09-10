@@ -12,11 +12,17 @@ class DatetimeField extends BaseField
             return false;
         }
 
-        if ($value === null || $value === '') return true;
-        if (!is_string($value)) return false;
+        if ($value === null || $value === '') {
+            return true;
+        }
+        if (!is_string($value)) {
+            return false;
+        }
         foreach (['Y-m-d\\TH:i', 'Y-m-d\\TH:i:s', 'Y-m-d\\TH:i:s\\Z', 'Y-m-d\\TH:i:sP', 'Y-m-d H:i:s'] as $format) {
             $date = \DateTimeImmutable::createFromFormat('!' . $format, $value, new \DateTimeZone('UTC'));
-            if ($date && $date->format($format) === $value) return true;
+            if ($date && $date->format($format) === $value) {
+                return true;
+            }
         }
         return false;
     }

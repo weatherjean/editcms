@@ -8,7 +8,9 @@ class BooleanField extends BaseField
 {
     public function validate(mixed $value, array $config): bool
     {
-        if (!parent::validate($value, $config)) return false;
+        if (!parent::validate($value, $config)) {
+            return false;
+        }
         return in_array($value, [null, '', true, false, 0, 1, '0', '1'], true);
     }
 

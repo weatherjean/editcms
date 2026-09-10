@@ -66,7 +66,7 @@ class MediaField extends BaseField
             }
 
             // Convert all items to integers, handling both IDs and objects
-            $sanitized = array_map(function($item) {
+            $sanitized = array_map(function ($item) {
                 // If it's an object/array with an 'id' property, extract it
                 if (is_array($item) && isset($item['id'])) {
                     return (int) $item['id'];
@@ -76,7 +76,7 @@ class MediaField extends BaseField
             }, $value);
 
             // Remove any zero values (failed conversions)
-            $sanitized = array_filter($sanitized, fn($v) => $v > 0);
+            $sanitized = array_filter($sanitized, fn ($v) => $v > 0);
 
             return !empty($sanitized) ? array_values($sanitized) : null;
         }

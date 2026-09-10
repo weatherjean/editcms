@@ -52,7 +52,9 @@ function handleMediaRoutes(string $method, string $path, Database $db, int $user
         }
 
         $extension = Security::uploadExtension($validation['mime']);
-        if ($extension === null) sendError('Unsupported file type', 400);
+        if ($extension === null) {
+            sendError('Unsupported file type', 400);
+        }
         $filename = bin2hex(random_bytes(16)) . '.' . $extension;
         $uploadPath = $uploadDir . '/' . $filename;
 
