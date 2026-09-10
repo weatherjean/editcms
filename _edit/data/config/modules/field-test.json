@@ -4,7 +4,7 @@
       "key": "field_test",
       "label": "Field Test",
       "label_plural": "Field Tests",
-      "description": "Test all 12 field types",
+      "description": "Examples of common field types",
       "icon": "settings",
       "allow_open": false
     }
@@ -13,7 +13,7 @@
     {
       "key": "all_fields",
       "title": "All Field Types",
-      "description": "Test all 12 field types",
+      "description": "Examples of common field types",
       "locations": ["field_test"],
       "fields": [
         {

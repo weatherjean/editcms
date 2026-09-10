@@ -13,7 +13,17 @@
       </button>
     </div>
 
-    <div class="card bg-base-100 border shadow" v-if="contentItems.length > 0">
+    <div v-if="loadingContent" role="status" class="flex justify-center gap-3 py-16">
+      <span class="loading loading-spinner" aria-hidden="true"></span>
+      Loading content…
+    </div>
+
+    <div v-else-if="loadError" role="alert" class="alert alert-error">
+      <span>{{ loadError }}</span>
+      <button class="btn btn-sm" @click="loadContent">Try again</button>
+    </div>
+
+    <div v-else-if="contentItems.length > 0" class="card bg-base-100 border shadow">
       <div class="overflow-x-auto">
         <table class="table">
           <thead>
@@ -77,9 +87,10 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useApi } from '../composables/useApi'
+import { useContentList } from '../composables/useContentList'
 import { useToast } from '../composables/useToast'
 import IconEdit from '../components/icons/IconEdit.vue'
 import IconTrash from '../components/icons/IconTrash.vue'
@@ -95,35 +106,15 @@ const { success, error } = useToast()
 const { confirm: confirmDialog } = useConfirm()
 const { formatDateTime } = useDate()
 
-const contentItems = ref([])
-
 const currentType = computed(() => route.params.type)
 
 const currentPostType = computed(() => {
   return props.postTypes.find(pt => pt.key === currentType.value)
 })
 
-async function loadContent() {
-  if (!currentType.value) return
-
-  try {
-    contentItems.value = await apiRequest('GET', `/${currentType.value}`)
-
-    // If this is a singleton post type, redirect to edit or create
-    if (currentPostType.value?.singleton) {
-      if (contentItems.value.length > 0) {
-        // Redirect to edit the single item
-        router.replace(`/${currentType.value}/${contentItems.value[0].id}`)
-      } else {
-        // Redirect to create the single item
-        router.replace(`/${currentType.value}/create`)
-      }
-    }
-  } catch (error) {
-    console.error('Failed to load content:', error)
-    contentItems.value = []
-  }
-}
+const { contentItems, loadingContent, loadError, loadContent } = useContentList(
+  apiRequest, currentType, currentPostType, router
+)
 
 function createContent() {
   router.push(`/${currentType.value}/create`)
