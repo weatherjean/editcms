@@ -2,17 +2,15 @@
 
 Reviewed 8 September 2026 against the working tree, including the six existing modified files. No application code, existing configuration, database, or uploads were changed during this review.
 
-**Subsequent decision and implementation:** Vue is staying. The dependency refresh requested after this inventory is complete; see [DEPENDENCY-UPDATE.md](DEPENDENCY-UPDATE.md) for versions, verification, and the remaining Quill advisory. The inventory below records the pre-upgrade baseline. The backend repair passes are documented in the linked follow-ups; this historical inventory is not the current status. The vanilla-JavaScript option is no longer planned.
+## Current status
 
-**ALTCHA follow-up:** [ALTCHA-INTEGRATION.md](ALTCHA-INTEGRATION.md) documents the completed CAPTCHA replacement, fixed public recipient policy, authenticated SMTP testing, atomic proof consumption, header/dot-stuffing/error-redaction changes, and fresh email-log schema repair. Those portions of the original findings below are now addressed. The other findings remain open.
+This document records the **pre-repair assessment from 8 September 2026**. The historical findings below are retained for context; they do not describe the current implementation.
 
-**Public boundary follow-up:** [PUBLIC-BOUNDARY-HARDENING.md](PUBLIC-BOUNDARY-HARDENING.md) records completed shared public serialization, publication/visibility checks, schema-directed population, upload naming and SVG restrictions, and corrected Apache/Nginx/development routing. Filtering, complete validation, revisions, session revocation and recovery remain open.
+Vue was retained. Completed repair passes cover [dependencies](DEPENDENCY-UPDATE.md), [contact-form verification and SMTP](ALTCHA-INTEGRATION.md), [public output and uploads](PUBLIC-BOUNDARY-HARDENING.md), [content validation and revisions](CONTENT-CORRECTNESS.md), [sessions and recovery](BACKUP-RECOVERY.md), [installation and roles](SETUP-AND-PERMISSIONS.md), and [HTML sanitization and configuration imports](HTML-AND-CONFIG-HARDENING.md).
 
-**Content correctness follow-up:** [CONTENT-CORRECTNESS.md](CONTENT-CORRECTNESS.md) records repaired numeric queries, qualified metadata identities, complete publish validation, zero/false handling, and atomic revision restoration. The earlier findings below remain the historical baseline. Session revocation, authorization, backup/restore and operational work remain outstanding.
+Automated local tests cover those repairs, including packaged HTTP and Apache/Nginx routing fixtures. Browser screenshots establish that the demo renders, but do not establish complete interactive coverage. Production PHP-FPM, load testing, image processing, editor conflict handling and a project-specific inquiry workflow remain outside that verification. The bundled example configuration now passes the whole-configuration validator. Content lists distinguish loading, failed requests and empty results; CI and automatic ZIP release workflows are included.
 
-**Recovery follow-up:** [BACKUP-RECOVERY.md](BACKUP-RECOVERY.md) records atomic password/session updates and a verified deployed-CMS backup/clean-restore workflow, including WAL data and encryption-key retention. Roles, first-run provisioning, browser workflows and production hosting validation remain open.
-
-**Setup/access follow-up:** [SETUP-AND-PERMISSIONS.md](SETUP-AND-PERMISSIONS.md) records one-time CLI setup codes, atomic first-account claims/config creation, administrator/editor permissions and last-admin protection. Existing users remain administrators. HTML sanitization, configuration-import atomicity, media processing and browser/hosting checks remain open.
+## Historical assessment
 
 **Decision: a conditional go for a small, internally managed real estate catalogue. Budget for backend repairs before production use.** There is enough working structure to justify reuse. The public API and recovery features currently have correctness problems that directly affect a property website. A public marketplace, multiple independent agencies, or owner self-service would require a substantially different authorization and operational design.
 

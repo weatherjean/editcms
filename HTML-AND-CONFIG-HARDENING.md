@@ -27,4 +27,4 @@ Atomic rename protects against partial publication during request failures/proce
 - `python3 tests/recovery-integration.py dist/_edit-html-config.zip`: includes active configuration generation backup/restore.
 - Existing CAPTCHA, public boundary, content, upload, deployment, email, setup and permission suites passed against the packaged build. PHP lint and full production build passed.
 
-Browser rendering and editor interaction have not been manually verified. The production bundle was built successfully; review real content and editor formatting on staging before upgrading a live site.
+The local demo configuration, property editor and email screens were rendered and captured on 10 September 2026. This is a visual smoke check, not a complete interaction test; review editing, saving, nested fields, media and responsive layouts on staging before upgrading a live site.

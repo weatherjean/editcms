@@ -4,7 +4,7 @@
 
 Use PHP 8.4 (tested) with PDO SQLite, SQLite3, fileinfo, OpenSSL, DOM and Zip, plus Apache 2.4 or Nginx/PHP-FPM. Use HTTPS in production. No Node.js or Composer is needed on the host.
 
-1. Build with `bash build.sh` and extract the ZIP's `_edit` folder into your website root.
+1. Download a ZIP from [GitHub Releases](https://github.com/weatherjean/editcmsb/releases), or build with `bash build.sh`, then extract its `_edit` folder into your website root. Release assets include `SHA256SUMS` for integrity checks.
 2. Install the server rules below. The PHP filesystem user must be able to create `config.php` on first boot and write `data/` and `uploads/`.
 3. Run `php /path/to/site/_edit/core/Operations/setup.php` as that user.
 4. Open `https://yourdomain.com/_edit/admin/` and use the one-time code to create the first administrator.

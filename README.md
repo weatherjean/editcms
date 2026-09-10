@@ -28,13 +28,19 @@ Open http://localhost:5173/_edit/admin/. For a fresh installation, run `php _edi
 bash build.sh
 ```
 
-The complete package is `dist/_edit-dev.zip`. PHP libraries and browser assets ship locally; the host needs neither Node.js nor Composer. See [deployment](DEPLOYMENT.md) for server rules, setup and upgrades, and [development](DEVELOPMENT.md) for architecture and tests.
+The complete package is `dist/_edit-dev.zip`. Successful pushes to `main` also publish a versioned ZIP and checksums in [GitHub Releases](https://github.com/weatherjean/editcmsb/releases). PHP libraries and browser assets ship locally; the host needs neither Node.js nor Composer. See [deployment](DEPLOYMENT.md) for server rules, setup and upgrades, and [development](DEVELOPMENT.md) for architecture and tests.
 
 ## Configuration
 
 Manage JSON modules, field groups and blocks in the admin. Imports validate the entire configuration and activate a complete snapshot. After the first change, use the interface/API rather than editing the original JSON files. See [configuration and HTML policies](HTML-AND-CONFIG-HARDENING.md).
 
 Public content is served at `/_edit/api/public/{type}`. The admin includes [API documentation](_edit/admin-source/PUBLIC-API.md). [Contact form integration](ALTCHA-INTEGRATION.md) includes a locally bundled example.
+
+## Scope and verification
+
+Designed for a small editorial team on a single PHP/SQLite server. The real-estate content in the preview is demo data; the public website is a separate application.
+
+The repository includes isolated regression tests for content, permissions, contact forms, deployment boundaries and recovery. See [test commands and limitations](DEVELOPMENT.md#tests).
 
 ## License
 

@@ -56,7 +56,9 @@ with tempfile.TemporaryDirectory(prefix='editcms-boundaries-') as directory:
             command=['php','-S',f'127.0.0.1:{p}',str(root/'router.php')]
         elif server=='nginx':
             config=root/'nginx-test.conf'
-            shutil.copyfile('/opt/homebrew/etc/nginx/fastcgi_params',root/'fastcgi_params')
+            nginx_dir = next((p for p in (Path('/etc/nginx'), Path('/opt/homebrew/etc/nginx')) if (p/'fastcgi_params').is_file()), None)
+            if nginx_dir is None: raise RuntimeError('Install nginx to run deployment tests')
+            shutil.copyfile(nginx_dir/'fastcgi_params',root/'fastcgi_params')
             config.write_text(f'''daemon off;
 master_process off;
 pid {root}/nginx.pid;
@@ -69,7 +71,7 @@ http {{
  fastcgi_temp_path {root}/fastcgi;
  uwsgi_temp_path {root}/uwsgi;
  scgi_temp_path {root}/scgi;
- include /opt/homebrew/etc/nginx/mime.types;
+ include {nginx_dir}/mime.types;
  server {{
  listen 127.0.0.1:{p};
  root {root};
@@ -78,18 +80,23 @@ http {{
  }}
 }}
 ''')
-            command=['nginx','-e',str(root/'nginx-error.log'),'-p','/opt/homebrew/etc/nginx/','-c',str(config)]
+            command=['nginx','-e',str(root/'nginx-error.log'),'-p',str(nginx_dir)+'/','-c',str(config)]
         else:
             config=root/'httpd.conf'
             modules=['mpm_prefork','authz_core','authz_host','unixd','dir','mime','rewrite','headers']
-            config.write_text('\n'.join(f'LoadModule {m}_module /usr/libexec/apache2/mod_{m}.so' for m in modules)+f'''
+            module_dir = Path('/usr/lib/apache2/modules') if Path('/usr/lib/apache2/modules').is_dir() else Path('/usr/libexec/apache2')
+            apache = shutil.which('apache2') or shutil.which('httpd') or '/usr/sbin/httpd'
+            mime_types = '/etc/mime.types' if Path('/etc/mime.types').is_file() else '/etc/apache2/mime.types'
+            # Some platforms compile unixd into the server instead of shipping a module.
+            config.write_text('\n'.join(f'LoadModule {m}_module {module_dir}/mod_{m}.so' for m in modules if (module_dir/f'mod_{m}.so').is_file())+f'''
 ServerRoot "{root}"
+DefaultRuntimeDir "{root}"
 ServerName localhost
 Listen 127.0.0.1:{p}
 PidFile "{root}/httpd.pid"
 ErrorLog "{root}/httpd-error.log"
 DocumentRoot "{root}"
-TypesConfig /etc/apache2/mime.types
+TypesConfig {mime_types}
 <Directory "{root}">
  Require all granted
  AllowOverride All
@@ -97,7 +104,7 @@ TypesConfig /etc/apache2/mime.types
  DirectoryIndex index.html index.php
 </Directory>
 ''')
-            command=['/usr/sbin/httpd','-f',str(config),'-DFOREGROUND']
+            command=[apache,'-f',str(config),'-DFOREGROUND']
         log=open(root/(server+'.log'),'w+')
         proc=subprocess.Popen(command,cwd=root,stdout=log,stderr=log,start_new_session=True)
         try:

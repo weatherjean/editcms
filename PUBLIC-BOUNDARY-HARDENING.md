@@ -1,6 +1,6 @@
 # Public boundary hardening
 
-Implemented 8 September 2026. This addresses public serialization, upload naming, and server routing findings in REVIVAL-ASSESSMENT.md. It does not complete the remaining filtering, validation, revision, authentication, or recovery backlog.
+Implemented 8 September 2026. This addresses public serialization, upload naming, and server routing findings in REVIVAL-ASSESSMENT.md. Filtering, validation and revision repairs are documented in CONTENT-CORRECTNESS.md; authentication and recovery repairs are documented in SETUP-AND-PERMISSIONS.md and BACKUP-RECOVERY.md.
 
 ## Public content contract
 

@@ -10,6 +10,10 @@ echo ""
 
 # Get version from user or use default
 VERSION=${1:-"dev"}
+if [[ ! "$VERSION" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]; then
+    echo "Invalid build version" >&2
+    exit 1
+fi
 OUTPUT_DIR="dist"
 OUTPUT_FILE="${OUTPUT_DIR}/_edit-${VERSION}.zip"
 

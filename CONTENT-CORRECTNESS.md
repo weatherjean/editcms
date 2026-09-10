@@ -43,4 +43,4 @@ Revision reads and restores are scoped to the requested content type and content
 - `python3 tests/content-integration.py [dist/_edit-content-fixes.zip]`: real local HTTP CRUD, both public aliases, authenticated queries, visibility, malformed/oversized requests, 422 responses, and restoration with synthetic configuration/data.
 - Earlier public-boundary, upload, deployment and CAPTCHA/email regression suites remain applicable.
 
-Browser editing and full production PHP-FPM integration remain unverified. Session revocation, backup/recovery and the other remaining audit findings are separate work.
+Browser editing and full production PHP-FPM integration remain unverified. Subsequent session and backup/recovery work is documented in BACKUP-RECOVERY.md; installation and role controls are documented in SETUP-AND-PERMISSIONS.md.

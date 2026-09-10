@@ -1,0 +1,85 @@
+name: Test and release
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cms-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: _edit/admin-source/package-lock.json
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite, sqlite3, fileinfo, openssl, dom, zip
+          coverage: none
+      - name: Install deployment-test servers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nginx apache2
+      - name: Check PHP formatting
+        run: |
+          curl --fail --location --silent --show-error https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/releases/download/v3.95.25/php-cs-fixer.phar -o "$RUNNER_TEMP/php-cs-fixer.phar"
+          echo "80cad475fc5112fdbfab8bd66e51665ed78c1b849b918dab81fb63b7a7003b41  $RUNNER_TEMP/php-cs-fixer.phar" | sha256sum -c -
+          php "$RUNNER_TEMP/php-cs-fixer.phar" fix --sequential --dry-run --diff --config=.php-cs-fixer.dist.php
+      - name: Set release version
+        id: version
+        run: echo "version=v$(git show -s --format=%cs HEAD | tr '-' '.').${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+      - name: Build and test the distribution
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: bash tests/run.sh "$VERSION"
+      - name: Checksum the verified ZIP
+        run: |
+          cd dist
+          sha256sum _edit-*.zip > SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verified-distribution
+          path: |
+            dist/_edit-*.zip
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: verified-distribution
+          path: dist
+      - name: Publish verified release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.checks.outputs.version }}
+        run: bash scripts/publish-release.sh

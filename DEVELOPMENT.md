@@ -24,7 +24,7 @@ PHP runs on port 8000; Vite runs on port 5173 and proxies API/uploads. Open http
 | `_edit/uploads/` | Uploaded media |
 | `tests/` | Isolated PHP and HTTP regression fixtures |
 
-Content stores core attributes in `content` and custom values in `content_meta`. Field schemas drive validation, queries and public serialization. Configuration changes use immutable generations selected by an atomic pointer; use the admin/API after activation. The repository includes legacy example schemas, which may need conflicting definitions reconciled before importing together.
+Content stores core attributes in `content` and custom values in `content_meta`. Field schemas drive validation, queries and public serialization. Configuration changes use immutable generations selected by an atomic pointer; use the admin/API after activation. The bundled example schemas are validated by `tests/example-config.php`. The redundant `post.json` module has been removed; `blog.json` is the canonical example for posts.
 
 Sessions live in SQLite. Fresh setup requires a CLI-generated one-time code; users added later default to Editor. ALTCHA protects public contact submissions; SMTP and encryption use PHP extensions. ALTCHA PHP and HTML Purifier are vendored with licenses; Composer is not required.
 
@@ -40,16 +40,12 @@ Always use the complete builder. It runs `npm ci`, builds the admin, copies PHP 
 ## Tests
 
 ```sh
-for test in tests/captcha.php tests/public-boundaries.php tests/content-correctness.php tests/auth-sessions.php tests/setup-permissions.php tests/html-config.php; do
-  php "$test" || exit 1
-done
-bash build.sh dev
-for test in tests/content-integration.py tests/upload-boundaries.py tests/deployment-boundaries.py tests/email_integration.py tests/recovery-integration.py tests/setup-integration.py tests/config-integration.py; do
-  python3 "$test" dist/_edit-dev.zip || exit 1
-done
+bash tests/run.sh test
 ```
 
-HTTP fixtures use temporary installations and localhost sockets. Email tests use a local SMTP fixture and do not send real mail. Deployment tests additionally exercise Apache/Nginx when those executables are installed. Run browser checks for editor formatting, nested fields, media and narrow layouts before releasing; command-line tests do not establish UI correctness.
+This lints PHP, builds the complete ZIP, checks the bundled example schemas, and runs content-list state, content API, permissions, CAPTCHA, upload, deployment, recovery and release regressions. Install Apache and Nginx for the server-boundary fixtures (`brew install nginx` plus the system Apache on macOS; `apt-get install nginx apache2` on Ubuntu).
+
+HTTP fixtures use temporary installations and localhost sockets. Email tests use a local SMTP fixture and do not send real mail. Deployment tests require Apache and Nginx and fail if a required server is unavailable. Run browser checks for editor formatting, nested fields, media and narrow layouts before releasing; command-line tests do not establish UI correctness.
 
 See [content behavior](CONTENT-CORRECTNESS.md), [HTML/configuration](HTML-AND-CONFIG-HARDENING.md), [roles](SETUP-AND-PERMISSIONS.md) and [recovery](BACKUP-RECOVERY.md) for contracts. [Dependency notes](DEPENDENCY-UPDATE.md) record versions and the remaining Quill advisory. [The original assessment](REVIVAL-ASSESSMENT.md) is historical, not a list of current failures.
 
@@ -58,3 +54,15 @@ See [content behavior](CONTENT-CORRECTNESS.md), [HTML/configuration](HTML-AND-CO
 Add PHP field implementations under `core/Fields/` and corresponding controls in `admin-source/src/components/FieldRenderer.vue`; update the schema validator and tests too. API route handlers belong under `api/routes/` or `admin-api/routes/`, with explicit public/role boundaries. Database schema changes belong in `core/Database/Database.php` and need upgrade coverage.
 
 Build and test the ZIP after changes. Follow [deployment](DEPLOYMENT.md) for upgrades: the encryption key, database, complete configuration directory and uploads must be retained together.
+
+## Formatting
+
+Project-owned PHP uses `.php-cs-fixer.dist.php` with PHP-CS-Fixer 3.95.25. Run `php-cs-fixer fix --sequential` to format or add `--dry-run --diff` to check. Vendored libraries are excluded and retain their original source. CI downloads the pinned formatter and verifies its checksum; it is not a runtime dependency.
+
+## CI and releases
+
+`.github/workflows/ci.yml` checks pull requests and pushes to `main` on Ubuntu with PHP 8.4 and Node 24. The jobs build and test one distribution, then pass that exact ZIP and `SHA256SUMS` to the release job. Only a successful push to `main` publishes; PRs and manual runs produce downloadable workflow artifacts without a release.
+
+Versions use `vYYYY.MM.DD.RUN_NUMBER`, for example `v2026.09.10.12`. The date comes from the source commit; the run number distinguishes pushes. Releases target the tested commit and start as drafts until both assets are uploaded. Reruns leave published releases unchanged and can resume interrupted drafts. Only the release job receives repository write permission. No personal access token is required.
+
+Automation takes effect once this workflow is pushed and Actions is enabled on the repository. Local checks validate the scripts and workflow, but a hosted run is still required to verify GitHub's permissions and release publication.
