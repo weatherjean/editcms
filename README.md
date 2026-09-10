@@ -2,6 +2,8 @@
 
 A small, self-contained headless CMS for PHP hosting, with a Vue admin and SQLite storage.
 
+![Configuration, email settings and property editor in _edit CMS](docs/images/cms-preview.png)
+
 - Custom content types, field groups, repeaters and flexible content blocks
 - Rich text, media, relationships and typed content queries
 - Drafts, publishing and revision restore
