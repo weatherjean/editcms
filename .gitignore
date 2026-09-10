@@ -27,3 +27,13 @@ server.log
 # OS
 .DS_Store
 Thumbs.db
+
+# Generated runtime state and Python bytecode
+_edit/data/.operations.lock
+_edit/data/.config.lock
+_edit/data/config/.write.lock
+_edit/data/config/.active.json
+_edit/data/config/.versions/
+_edit/data/config/.pointer-*
+__pycache__/
+*.pyc

@@ -16,6 +16,7 @@ OUTPUT_FILE="${OUTPUT_DIR}/_edit-${VERSION}.zip"
 # Step 1: Build distribution directory
 echo "📦 Preparing distribution..."
 TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TEMP_DIR"' EXIT
 DIST_ROOT="${TEMP_DIR}/_edit"
 
 # Create directory structure
@@ -30,7 +31,8 @@ mkdir -p "${DIST_ROOT}/uploads"
 echo "📦 Building Vue frontend..."
 cd _edit/admin-source
 
-npm install --silent
+npm ci --silent
+npm run vendor:altcha
 
 # Clean and build to temp directory
 rm -rf "${DIST_ROOT}/admin"
@@ -63,6 +65,7 @@ cp _edit/index.html "${DIST_ROOT}/"
 cp _edit/.htaccess "${DIST_ROOT}/"
 cp _edit/.user.ini "${DIST_ROOT}/"
 cp _edit/nginx.conf "${DIST_ROOT}/"
+cp LICENSE DEPLOYMENT.md BACKUP-RECOVERY.md SETUP-AND-PERMISSIONS.md ALTCHA-INTEGRATION.md PUBLIC-BOUNDARY-HARDENING.md HTML-AND-CONFIG-HARDENING.md "${DIST_ROOT}/"
 
 # Step 4.5: Generate .htaccess integrity hashes and inject into health.php
 echo "  → Generating .htaccess integrity hashes..."
@@ -101,10 +104,10 @@ DO NOT DELETE this folder when updating - it contains:
 - Your post types and field groups (data/config/)
 
 When updating _edit CMS:
-1. Backup this entire 'data' folder
-2. Delete the 'admin' folder
-3. Extract the new 'admin' folder from the update
-4. Done!
+1. Make and verify a full backup with core/Operations/backup.php.
+2. Keep config.php, this entire data directory (including hidden files), and uploads.
+3. Replace admin, admin-api, api, core, and the supplied server rules together.
+4. Verify the update on an isolated restore before switching the live site.
 EOF
 
 echo "✓ Files prepared"
