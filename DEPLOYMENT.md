@@ -1,104 +1,52 @@
-# Deployment Guide
+# Deployment
 
-## Installation
+## Install
 
-1. Extract the `_edit` folder to your website root
-2. Visit `https://yourdomain.com/_edit/admin/`
-3. Create your admin account (first user only)
+Use PHP 8.4 (tested) with PDO SQLite, SQLite3, fileinfo, OpenSSL, DOM and Zip, plus Apache 2.4 or Nginx/PHP-FPM. Use HTTPS in production. No Node.js or Composer is needed on the host.
 
-The system automatically creates all necessary directories and database on first run.
+1. Download a ZIP from [GitHub Releases](https://github.com/weatherjean/editcmsb/releases), or build with `bash build.sh`, then extract its `_edit` folder into your website root. Release assets include `SHA256SUMS` for integrity checks.
+2. Install the server rules below. The PHP filesystem user must be able to create `config.php` on first boot and write `data/` and `uploads/`.
+3. Run `php /path/to/site/_edit/core/Operations/setup.php` as that user.
+4. Open `https://yourdomain.com/_edit/admin/` and use the one-time code to create the first administrator.
 
-## Requirements
+New accounts default to Editor, with access to content and media. Administrators also manage users, configuration and email settings. Password and role changes revoke the affected user’s sessions.
 
-- PHP 8.1+ with extensions: SQLite3, PDO, JSON, fileinfo
-- Apache with mod_rewrite enabled OR Nginx
+## Server rules
 
-Most shared hosting (cPanel, Plesk) meets these requirements by default.
+**Apache:** enable mod_rewrite and `AllowOverride All`. Keep every included `.htaccess`, including the root and uploads rules.
 
-## Server Configuration
+**Nginx:** include `/path/to/site/_edit/nginx.conf` inside your existing server block. Set its PHP-FPM socket for your host, use a canonical document root without symlinks, avoid competing `/_edit/` locations, and run `nginx -t` before reloading.
 
-### Apache
+Private data/core paths must be inaccessible and uploads must never execute PHP. Check `/_edit/api/health` and verify those boundaries after deployment. The PHP development router is for local use.
 
-Works automatically. The included `.htaccess` files handle all routing.
+## Contact forms
 
-If you get 404 errors, contact your hosting provider to enable mod_rewrite.
+Configure SMTP, **Contact Form Recipient** and ALTCHA in Email. The widget/verifier ship locally. See the contact-form section of the admin’s API reference and `/_edit/admin/altcha/contact-example.html`; submitting the example sends a real message to the configured recipient.
 
-### Nginx
+Old color-CAPTCHA forms must be migrated: `/send-email/token` now returns 410. Existing explicit verification opt-outs are retained; new installations enable verification.
 
-Add this to your server block:
+## Upgrade and recovery
 
-```nginx
-server {
-    listen 80;
-    server_name yourdomain.com;
-    root /var/www/yoursite;
+1. Use `core/Operations/backup.php` to make and verify a full backup; keep a copy off-host.
+2. Test the new build on an isolated restore before switching the live site.
+3. Replace `admin/`, `admin-api/`, `api/`, `core/` and the supplied server rules together.
+4. Retain `config.php` (encryption key), all of `data/`, and `uploads/`. Hidden configuration pointers/generations are part of the data.
 
-    include /var/www/yoursite/_edit/nginx.conf;
-}
+Public responses exclude private/undeclared fields and login-user relationships; SVG uploads are blocked. HTML fields now permit safe formatting only. Configuration changes validate the entire candidate and require a backup; after activation, use the admin/API instead of editing legacy root JSON files.
+
+Create the backup directory outside the website root. Run the CLI as the PHP filesystem user:
+
+```sh
+php /path/to/site/_edit/core/Operations/backup.php backup /path/to/site/_edit /private/backups/cms.zip
+php /path/to/site/_edit/core/Operations/backup.php verify /private/backups/cms.zip
+php /path/to/site/_edit/core/Operations/backup.php restore /private/backups/cms.zip /new/site/_edit
 ```
 
-Then reload: `nginx -s reload`
-
-## Email Setup (Optional)
-
-Go to Email in the admin menu to configure SMTP.
-
-Common providers:
-- Gmail: smtp.gmail.com:587 (TLS, requires App Password)
-- SendGrid: smtp.sendgrid.net:587 (TLS)
-- Mailgun: smtp.mailgun.org:587 (TLS)
+The backup file and restore destination must not already exist. Backups include credentials and private data and are not encrypted; restrict access. Restores retain content, accounts and the encryption key, clear sessions, and require filesystem ownership and environment-specific configuration to be checked before use. Back up website files outside `_edit` separately.
 
 ## Troubleshooting
 
-### 500 Error on First Load
-
-Create these folders manually via FTP/cPanel:
-```
-_edit/data/database/
-_edit/uploads/
-```
-
-### 404 Errors on Admin
-
-Apache: Contact hosting to enable AllowOverride All for .htaccess
-Nginx: Verify you included _edit/nginx.conf in server block
-
-### Cannot Upload Media
-
-Set uploads directory permissions to 755:
-```bash
-chmod 755 _edit/uploads/
-```
-
-Or via cPanel File Manager: Right-click uploads > Change Permissions > 755
-
-### File Upload Size Limits
-
-Default limit is 50MB (configured in .user.ini).
-
-To increase:
-- cPanel/Plesk: PHP Options > upload_max_filesize and post_max_size
-- VPS: Edit php.ini and set both values
-- Nginx: Add `client_max_body_size 50M;` to server block
-
-### Registration Disabled
-
-A user already exists. Log in and create more users via the Users page.
-
-## System Status
-
-Visit `/_edit/api/health` to check system configuration and requirements.
-
-## Updating
-
-1. Backup: data/database/, uploads/, and data/config/
-2. Replace: admin/, admin-api/, api/, and core/ folders
-3. Keep: Your data/database/, uploads/, and data/config/ unchanged
-
-## Security
-
-- Protected directories: /data/, /core/ return 403
-- Rate limiting on login and email endpoints
-- Session-based authentication
-- Registration auto-locks after first user
-- File upload validation and type restrictions
+- **500:** inspect PHP logs, required extensions and filesystem ownership. Do not enable public error output.
+- **404 on admin/API:** check Apache overrides or the Nginx include and PHP-FPM socket.
+- **Uploads fail:** check PHP-user write access, `upload_max_filesize`, `post_max_size` and the web server's request limit. The packaged `.user.ini` sets a 50 MB PHP upload limit; endpoint-specific limits still apply.
+- **Configuration change fails:** review the reported validation error and available disk space. Reconcile duplicate legacy definitions in one import. Old configuration generations/backups are retained, so monitor their size.
